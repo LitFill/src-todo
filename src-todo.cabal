@@ -1,0 +1,23 @@
+cabal-version:   3.0
+name:            src-todo
+version:         0.1.0.0
+license:         NONE
+build-type:      Simple
+extra-doc-files: CHANGELOG.md
+
+common warnings
+    ghc-options: -Wall
+
+executable src-todo
+    import:           warnings
+    main-is:          Main.hs
+    build-depends:
+        , base ^>=4.21.0.0
+        , megaparsec
+        , text
+        , time
+        , flow
+        , directory
+
+    hs-source-dirs:   .
+    default-language: GHC2024
