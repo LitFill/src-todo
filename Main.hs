@@ -1,4 +1,5 @@
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE MultilineStrings #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -6,8 +7,8 @@
 
 module Main where
 
-import Control.Monad    (forM_, unless, when)
-import Data.Maybe       (fromJust, isNothing, mapMaybe)
+import Control.Monad    (forM_, unless, when, void)
+import Data.Maybe       (fromJust, isNothing, mapMaybe, fromMaybe)
 import Data.Text        (Text)
 import Data.Time        (getCurrentTime)
 import Data.Time.Format (defaultTimeLocale, formatTime)
@@ -17,7 +18,6 @@ import System.IO        (hClose, openTempFile)
 import Text.Printf      (printf)
 
 import Data.Function
-import Data.Functor
 import Flow
 import Text.Megaparsec
 import Text.Megaparsec.Char
