@@ -25,6 +25,11 @@ import Text.Megaparsec.Char
 import Data.Text           qualified as T
 import Data.Text.IO        qualified as TIO
 import Options.Applicative qualified as O
+import Data.Char (isSpace)
+
+----------------------------------------
+-- Types
+----------------------------------------
 
 data Location = Location
     { locFilePath   :: FilePath
@@ -59,7 +64,11 @@ noIdAndLocTodo pref suff =
     Todo Nothing pref suff Nothing
 
 addLoc :: FilePath -> Int -> Todo -> Todo
-addLoc f l t = t {todoLoc = Just (Location f l)}
+addLoc f l t = t {todoLoc = Location f l &Just}
+
+----------------------------------------
+-- Parser
+----------------------------------------
 
 type Parser = Parsec Void Text
 
@@ -85,6 +94,10 @@ noIdTodoP = do
 
 todoP :: Parser Todo
 todoP = try withIdTodoP <|> noIdTodoP
+
+----------------------------------------
+-- File IOs
+----------------------------------------
 
 infixl 0 ||>
 (||>) :: Functor f => f a -> (a -> b) -> f b
@@ -116,20 +129,28 @@ persistTodo t = do
     pure (fromJust t.todoId)
 
 replaceAtLine :: Int -> FilePath -> String -> IO ()
-replaceAtLine l f (T.pack -> t) = do
-    ls <- f  |> TIO.readFile
-            ||> T.lines
-    if l <= 0 || l > length ls
-        then printf "[ERROR] replaceAtLine: line number %d is out of bounds." l
-        else do
-            let
-                (hd, tl) = splitAt (l - 1) ls
-                ls' = hd ++ [t] ++ drop 1 tl
-                f'  = T.unlines ls'
-            (tmpFile, tmpHandle) <- openTempFile "." ".src-todo-temp.txt"
-            TIO.hPutStr tmpHandle f'
-            hClose tmpHandle
-            renameFile tmpFile f
+replaceAtLine lnum fname (T.pack -> text) =
+    fname
+      & TIO.readFile
+    >>= T.lines
+     .> process
+  where
+    process ls | lnum <= 0 || lnum > length ls =
+        printf
+            "[ERROR] replaceAtLine: line number %d is out of bounds."
+            lnum
+    process ls = do
+        let (hd, tl) = ls &splitAt (lnum - 1)
+        let ls' = hd ++[ text ]++ drop 1 tl
+        let f'  = T.unlines ls'
+        (tmpFile, tmpHandle) <- openTempFile "." ".src-todo-temp.txt"
+        TIO.hPutStr tmpHandle f'
+        hClose tmpHandle
+        renameFile tmpFile fname
+
+----------------------------------------
+-- Commands
+----------------------------------------
 
 data Command
     = Register [FilePath]
