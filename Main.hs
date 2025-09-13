@@ -1,21 +1,20 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Main where
 
-import Control.Monad      (when, unless, forM_)
-import Data.Maybe         (fromJust, isNothing, mapMaybe)
-import Data.Text          (Text)
-import Data.Time          (getCurrentTime)
-import Data.Time.Format   (formatTime, defaultTimeLocale)
-import Data.Void          (Void)
-import System.Directory   (renameFile)
-import System.Environment (getArgs)
-import System.IO          (openTempFile, hClose)
-import Text.Printf        (printf)
+import Control.Monad    (forM_, unless, when)
+import Data.Maybe       (fromJust, isNothing, mapMaybe)
+import Data.Text        (Text)
+import Data.Time        (getCurrentTime)
+import Data.Time.Format (defaultTimeLocale, formatTime)
+import Data.Void        (Void)
+import System.Directory (renameFile)
+import System.IO        (hClose, openTempFile)
+import Text.Printf      (printf)
 
 import Data.Function
 import Data.Functor
@@ -23,8 +22,9 @@ import Flow
 import Text.Megaparsec
 import Text.Megaparsec.Char
 
-import Data.Text    qualified as T
-import Data.Text.IO qualified as TIO
+import Data.Text           qualified as T
+import Data.Text.IO        qualified as TIO
+import Options.Applicative qualified as O
 
 data Location = Location
     { locFilePath   :: FilePath
@@ -105,8 +105,8 @@ files2todos fnames = concat <$> mapM extractTodos fnames
 registerTodo :: Todo -> IO Todo
 registerTodo todo = do
     time <- getCurrentTime
-        <&> formatTime defaultTimeLocale "%Y%m%d%H%M%S%q"
-    pure todo {todoId = time &take 20 &Just}
+        <&> formatTime defaultTimeLocale "%Y%md%H%M%S%q"
+    pure todo{todoId = time & take 20 & Just}
 
 persistTodo :: Todo -> IO String
 persistTodo t = do
@@ -117,7 +117,8 @@ persistTodo t = do
 
 replaceAtLine :: Int -> FilePath -> String -> IO ()
 replaceAtLine l f (T.pack -> t) = do
-    ls <- f |> TIO.readFile ||> T.lines
+    ls <- f  |> TIO.readFile
+            ||> T.lines
     if l <= 0 || l > length ls
         then printf "[ERROR] replaceAtLine: line number %d is out of bounds." l
         else do
@@ -130,41 +131,72 @@ replaceAtLine l f (T.pack -> t) = do
             hClose tmpHandle
             renameFile tmpFile f
 
-handleArgs :: [String] -> IO ()
-handleArgs = \case
-    "register" : files -> do
+data Command
+    = Register [FilePath]
+    | Show String [FilePath]
+    | List [FilePath]
+    | ReplaceId String String [FilePath]
+
+files :: O.Parser [FilePath]
+files = O.metavar "FILES..." &O.argument O.str &O.some
+
+register :: O.Parser Command
+register = Register <$> files
+
+show' :: O.Parser Command
+show' =
+    Show
+    <$> O.argument O.str (O.metavar "ID")
+    <*> files
+
+list :: O.Parser Command
+list = List <$> files
+
+replaceId :: O.Parser Command
+replaceId =
+    ReplaceId
+    <$> O.argument O.str (O.metavar "OLD_ID")
+    <*> O.argument O.str (O.metavar "NEW_ID")
+    <*> files
+
+opts :: O.Parser Command
+opts =
+    O.subparser <|
+       O.command "register"   (O.info register  (O.progDesc "Register new todos"))
+    <> O.command "show"       (O.info show'     (O.progDesc "Show a todo by id"))
+    <> O.command "list"       (O.info list      (O.progDesc "List all todos"))
+    <> O.command "replace-id" (O.info replaceId (O.progDesc "Replace a todo's id"))
+
+main :: IO ()
+main = do
+    cmd <- O.execParser (O.info (opts O.<**> O.helper) (O.progDesc "A simple todo manager"))
+    handleCommand cmd
+
+handleCommand :: Command -> IO ()
+handleCommand = \case
+    Register fnames -> do
         todos <-
-            files2todos files
+            files2todos fnames
             >>= traverse registerTodo
               . filter (todoId .> isNothing)
         ids <- unlines <$> mapM persistTodo todos
         unless (null ids) do
             printf "Registered new todos with these ids:\n%s" ids
 
-    "show" : id' : files -> do
-        todos <- files2todos files
+    Show id' fnames -> do
+        todos <- files2todos fnames
         forM_ todos \t ->
             when (t.todoId == Just id') do
-                t &showTodo &putStrLn
+                t & showTodo & putStrLn
 
-    "list" : files ->
-        files2todos files
+    List fnames ->
+        files2todos fnames
         >>= mapM_ (showTodo .> putStrLn)
 
-    "replace-id" : oldId : newId : files -> do
-        todos <- files2todos files
+    ReplaceId oldId newId fnames -> do
+        todos <- files2todos fnames
         forM_ todos \t ->
             when (t.todoId == Just oldId) do
-                let t' = t {todoId = Just newId}
-                _ <- t' &persistTodo
-                printf "The id %s is replaced with %s"
-                    oldId newId
-    _ -> usage
-
-usage :: IO ()
-usage = printf
-    "Usage: todo [show <id> | register | list | replace <old-id> <new-id>]  <files...>"
-
-main :: IO ()
-main = getArgs >>= handleArgs
-
+                let t' = t{todoId = Just newId}
+                _ <- t' & persistTodo
+                printf "The id %s is replaced with %s" oldId newId
