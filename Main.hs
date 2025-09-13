@@ -205,8 +205,10 @@ handleCommand = \case
         todos <-
             files2todos fnames
             >>= traverse registerTodo
-              . filter (todoId .> isNothing)
-        ids <- unlines <$> mapM persistTodo todos
+              . filter
+              ( todoId
+             .> isNothing )
+        ids <- unlines <$> traverse persistTodo todos
         unless (null ids) do
             printf "Registered new todos with these ids:\n%s" ids
 
@@ -214,16 +216,27 @@ handleCommand = \case
         todos <- files2todos fnames
         forM_ todos \t ->
             when (t.todoId == Just id') do
-                t & showTodo & putStrLn
+                t &displayTodo &putStrLn
 
     List fnames ->
         files2todos fnames
-        >>= mapM_ (showTodo .> putStrLn)
+        >>= mapM_
+          ( displayTodo
+         .> putStrLn )
 
     ReplaceId oldId newId fnames -> do
         todos <- files2todos fnames
         forM_ todos \t ->
             when (t.todoId == Just oldId) do
-                let t' = t{todoId = Just newId}
-                _ <- t' & persistTodo
+                t {todoId = Just newId}
+                  &persistTodo &void
                 printf "The id %s is replaced with %s" oldId newId
+
+main :: IO ()
+main = do
+    cmd <-
+        O.execParser
+        <| O.info     (opts O.<**> O.helper)
+        <| O.progDesc "A simple todo manager"
+    handleCommand cmd
+
