@@ -138,7 +138,10 @@ data Command
     | ReplaceId String String [FilePath]
 
 files :: O.Parser [FilePath]
-files = O.metavar "FILES..." &O.argument O.str &O.some
+files =
+    O.metavar "FILES..."
+    & O.argument O.str
+    & O.some
 
 register :: O.Parser Command
 register = Register <$> files
@@ -161,16 +164,19 @@ replaceId =
 
 opts :: O.Parser Command
 opts =
-    O.subparser <|
-       O.command "register"   (O.info register  (O.progDesc "Register new todos"))
-    <> O.command "show"       (O.info show'     (O.progDesc "Show a todo by id"))
-    <> O.command "list"       (O.info list      (O.progDesc "List all todos"))
-    <> O.command "replace-id" (O.info replaceId (O.progDesc "Replace a todo's id"))
-
-main :: IO ()
-main = do
-    cmd <- O.execParser (O.info (opts O.<**> O.helper) (O.progDesc "A simple todo manager"))
-    handleCommand cmd
+    O.subparser
+    <| ( O.progDesc "Register new todos"
+       & O.info      register
+       & O.command  "register" )
+    <> ( O.progDesc "Show a todo by id"
+       & O.info      show'
+       & O.command  "show" )
+    <> ( O.progDesc "List all todos"
+       & O.info      list
+       & O.command  "list" )
+    <> ( O.progDesc "Replace a todo's id"
+       & O.info      replaceId
+       & O.command  "replace-id" )
 
 handleCommand :: Command -> IO ()
 handleCommand = \case
