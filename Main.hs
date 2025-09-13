@@ -106,20 +106,25 @@ a ||> f = f <$> a
 extractTodos :: FilePath -> IO [Todo]
 extractTodos fname = do
     fname
-         |> TIO.readFile
-        ||> T.lines
-        ||> zip [1..]
-        ||> fmap (fmap (parseMaybe todoP))
-        ||> mapMaybe \(a, b) -> addLoc fname a <$> b
+     |> TIO.readFile
+    ||> T.lines
+    ||> zip [1..]
+    ||> fmap (fmap (parseMaybe todoP))
+    ||> mapMaybe \(a, b) -> addLoc fname a <$> b
 
 files2todos :: [FilePath] -> IO [Todo]
-files2todos fnames = concat <$> mapM extractTodos fnames
+files2todos fnames =
+    fnames
+     |> mapM extractTodos
+    ||> concat
 
 registerTodo :: Todo -> IO Todo
 registerTodo todo = do
     time <- getCurrentTime
-        <&> formatTime defaultTimeLocale "%Y%md%H%M%S%q"
-    pure todo{todoId = time & take 20 & Just}
+            ||> formatTime
+                defaultTimeLocale
+                "%Y%m%d%H%M%S%q"
+    pure todo {todoId = time &take 20 &Just}
 
 persistTodo :: Todo -> IO String
 persistTodo t = do
