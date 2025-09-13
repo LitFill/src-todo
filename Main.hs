@@ -48,12 +48,26 @@ data Todo = Todo
     } deriving (Show, Read, Eq)
 
 showTodo :: Todo -> String
-showTodo (Todo (Just id') pref suff _) =
-    printf "%sTODO: (%s) %s"
-        pref id' suff
-showTodo (Todo _ pref suff _) =
-    printf "%sTODO: %s"
-        pref suff
+showTodo Todo {..} =
+    case todoId of
+        Just tid -> printf "%sTODO: (%s) %s" todoPrefix tid todoSuffix
+        Nothing  -> printf "%sTODO: %s"      todoPrefix     todoSuffix
+
+displayTodo :: Todo -> String
+displayTodo Todo {..} = fromMaybe err do
+    tid <- todoId
+    printf
+        """
+        # Todo
+          - note     : %s
+          - id       : %s
+          - location : %s
+        """
+        (dropWhile isSpace todoSuffix) tid
+        . loc2string <$> todoLoc
+  where
+    err = error
+        "displayTodo: Can not display a todo with no id or no location."
 
 noLocTodo :: String -> String -> String -> Todo
 noLocTodo (pure -> id') pref suff =
