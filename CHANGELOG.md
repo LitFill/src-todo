@@ -1,5 +1,5 @@
-# Revision history for src-todo
+## [unreleased]
 
-## 0.1.0.0 -- YYYY-mm-dd
+### 💼 Init
 
-* First version. Released on an unsuspecting world.
+- Feature parity with Tsoding's todo in OCaml
