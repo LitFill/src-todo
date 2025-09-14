@@ -93,6 +93,9 @@ noIdAndLocTodo pref suff =
 addLoc :: FilePath -> Int -> Todo -> Todo
 addLoc f l t = t {todoLoc = Location f l Flow.|> Just}
 
+hasId :: String -> Todo -> Bool
+hasId (Just -> tid) t = t.todoId == tid
+
 ----------------------------------------
 -- Parser
 ----------------------------------------
@@ -339,11 +342,11 @@ handleCommand = \case
                     "Registered new todos with these ids:\n%s"
                     ids
 
-    Show id' (isCompact -> display) fnames -> do
+    Show tid (isCompact -> display) fnames -> do
         todos <- files2todos (orDefault fnames)
-        let found = filter (\t -> t.todoId == Just id') todos
+        let found = filter (hasId tid) todos
         if null found then
-            putStrLn $ "[INFO] No TODO found with id: " ++ id'
+            putStrLn $ "[INFO] No TODO found with id: " ++ tid
         else
             mapM_ (display Flow..> putStrLn) found
 
@@ -355,7 +358,7 @@ handleCommand = \case
 
     ReplaceId oldId newId fnames -> do
         todos <- files2todos (orDefault fnames)
-        let found = filter (\t -> t.todoId == Just oldId) todos
+        let found = filter (hasId oldId) todos
         if null found then
             putStrLn $ "[INFO] No TODO found with id: " ++ oldId
         else
