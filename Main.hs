@@ -5,28 +5,25 @@
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ViewPatterns        #-}
 
-module Main where
+module Main (main) where
 
-import Control.Monad        (forM_, unless, when, void)
-import Data.Char            (isSpace)
-import Data.Maybe           (fromJust, isNothing, mapMaybe, fromMaybe)
-import Data.Text            (Text)
-import Data.Time            (getCurrentTime)
-import Data.Time.Format     (defaultTimeLocale, formatTime)
-import Data.Void            (Void)
-import System.Directory     (renameFile)
-import System.IO            (hClose, openTempFile)
-import Text.Megaparsec.Char (char, space, string, string')
-import Text.Printf          (printf)
-
-import Data.Function
-import Flow
-import System.Directory.Tree
-import Text.Megaparsec
-
-import Data.Text           qualified as T
-import Data.Text.IO        qualified as TIO
-import Options.Applicative qualified as O
+import qualified Control.Monad
+import qualified Data.Bool
+import qualified Data.Char
+import qualified Data.Maybe
+import qualified Data.Text
+import qualified Data.Text.IO
+import qualified Data.Time
+import qualified Data.Time.Format
+import qualified Data.Void
+import qualified Flow
+import qualified Options.Applicative
+import qualified System.Directory
+import qualified System.Directory.Tree
+import qualified System.IO
+import qualified Text.Megaparsec
+import qualified Text.Megaparsec.Char
+import qualified Text.Printf
 
 ----------------------------------------
 -- Types
