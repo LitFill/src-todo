@@ -159,7 +159,7 @@ extractTodos fname = do
     case eres of
         Left (show -> err) -> do
             Text.Printf.printf
-                "[ERROR] Could not read file: %s (%s)"
+                "[ERROR] Could not read file: %s (%s)\n"
                 fname  err
             pure []
         Right fileContent ->
@@ -178,7 +178,7 @@ extractTodos' root = do
     case eres of
         Left (show -> err) -> do
             Text.Printf.printf
-                "[ERROR] Could not read directory: %s (%s)"
+                "[ERROR] Could not read directory: %s (%s)\n"
                 root err
             pure []
         Right (_ System.Directory.Tree.:/ tree) ->
@@ -214,7 +214,7 @@ persistTodo t = do
             Control.Exception.catch @Control.Exception.IOException
                 (replaceAtLine l f $ showTodo t)
                 (Text.Printf.printf
-                    "[ERROR] Failed to persist TODO in file: %s (%s)" f
+                    "[ERROR] Failed to persist TODO in file: %s (%s)\n" f
                     . show)
     pure tid
 
@@ -229,10 +229,9 @@ replaceAtLine lnum fname (Data.Text.pack -> text) = do
         Right content      -> process $ Data.Text.lines content
   where
     process ls
-        | lnum <= 0 || lnum > length ls = putStrLn $
-            Text.Printf.printf
-                "[ERROR] replaceAtLine: line number %d is out of bounds in %s."
-                lnum fname
+        | lnum <= 0 || lnum > length ls = Text.Printf.printf
+            "[ERROR] replaceAtLine: line number %d is out of bounds in %s.\n"
+            lnum fname
         | otherwise = do
             let (hd, tl) = ls Flow.|> splitAt (lnum - 1)
             let ls' = hd ++ [text] ++ drop 1 tl
@@ -249,7 +248,7 @@ replaceAtLine lnum fname (Data.Text.pack -> text) = do
                     Control.Exception.catch @Control.Exception.IOException
                         (System.Directory.renameFile tmpFile fname)
                         (Text.Printf.printf
-                            "[ERROR] Could not rename temp file: %s"
+                            "[ERROR] Could not rename temp file: %s\n"
                             . show)
 
 ----------------------------------------
@@ -374,7 +373,9 @@ handleCommand = \case
 
 main :: IO ()
 main = do
-    eres <- Control.Exception.try @Control.Exception.IOException parseCLI
+    eres <- Control.Exception.try
+           @Control.Exception.IOException
+           parseCLI
     case eres of
         Left  err ->
             putStrLn $ "[ERROR] Could not parse command line: " ++ show err
