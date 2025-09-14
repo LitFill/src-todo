@@ -246,24 +246,24 @@ handleCommand = \case
             printf "Registered new todos with these ids:\n%s" ids
 
     Show id' fnames -> do
-        todos <- files2todos fnames
+        todos <- files2todos (fnames &orDefault)
         forM_ todos \t ->
             when (t.todoId == Just id') do
                 t &displayTodo &putStrLn
 
     List fnames ->
-        files2todos fnames
+        files2todos (fnames &orDefault)
         >>= mapM_
           ( displayTodo
          .> putStrLn )
 
     ReplaceId oldId newId fnames -> do
-        todos <- files2todos fnames
+        todos <- files2todos (fnames &orDefault)
         forM_ todos \t ->
             when (t.todoId == Just oldId) do
                 t {todoId = Just newId}
                   &persistTodo &void
-                printf "The id %s is replaced with %s" oldId newId
+                printf "The id %s is replaced with %s\n" oldId newId
 
 main :: IO ()
 main = do
