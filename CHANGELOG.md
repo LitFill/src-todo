@@ -2,13 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased
+## 0.3.0.0 - 2025-09-14
 
-[e914ee4](https://github.com/LitFill/src-todo/commit/e914ee411906117d3343fc73f84790e149a7972c)...[7929dc1](https://github.com/LitFill/src-todo/commit/7929dc1ad6b4f353773752717e3066aec7e7c797)
+[e914ee4](https://github.com/LitFill/src-todo/commit/e914ee411906117d3343fc73f84790e149a7972c)...[c316bc5](https://github.com/LitFill/src-todo/commit/c316bc52f75a65df843a1ea3939eab9efb4bd16d)
+
+### Bug Fixes
+
+- The changelog generator to use proper link ([edc4d13](https://github.com/LitFill/src-todo/commit/edc4d137c68d25c542bf2d002b7c1262878ee220))
+- No longger error when no Id ([a110e1b](https://github.com/LitFill/src-todo/commit/a110e1b79c70fc5f0f6c20efb0ac03d3464e5e08))
+
+### Features
+
+- Imports for the next few commits ([251f07b](https://github.com/LitFill/src-todo/commit/251f07bb990e472de05e28d46183379540291457))
+- Adding default "." if no file specified ([d26ba9a](https://github.com/LitFill/src-todo/commit/d26ba9a656206221c2d716a55981ef5b8de2b7c8))
+- Using directory-tree to extract Todos ([d73cba0](https://github.com/LitFill/src-todo/commit/d73cba0145e1a0fba5ecf8bf4340dd510d69d2f4))
 
 ### Miscellaneous Tasks
 
 - Bump version and update docs ([7929dc1](https://github.com/LitFill/src-todo/commit/7929dc1ad6b4f353773752717e3066aec7e7c797))
+- Bump version ([c316bc5](https://github.com/LitFill/src-todo/commit/c316bc52f75a65df843a1ea3939eab9efb4bd16d))
+
+### Refactor
+
+- Remove sample.hs ([cf7d7a3](https://github.com/LitFill/src-todo/commit/cf7d7a3faa0e7867450fe81fc04cd06641db977f))
 
 ## 0.2.0.0 - 2025-09-13
 
