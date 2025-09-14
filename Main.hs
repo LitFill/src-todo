@@ -55,20 +55,20 @@ showTodo Todo {..} =
         Nothing  -> printf "%sTODO: %s"      todoPrefix     todoSuffix
 
 displayTodo :: Todo -> String
-displayTodo Todo {..} = fromMaybe err do
-    tid <- todoId
-    printf
+displayTodo Todo {..} = maybe err go todoLoc
+  where
+    go = loc2string .> printf
         """
         # Todo
           - note     : %s
           - id       : %s
           - location : %s
         """
-        (dropWhile isSpace todoSuffix) tid
-        . loc2string <$> todoLoc
-  where
-    err = error
-        "displayTodo: Can not display a todo with no id or no location."
+        suff tid
+    suff = dropWhile isSpace todoSuffix
+    tid  = fromMaybe "" todoId
+    err  = error
+        "displayTodo: Can not display a todo with no location."
 
 noLocTodo :: String -> String -> String -> Todo
 noLocTodo (pure -> id') pref suff =
