@@ -219,11 +219,15 @@ opts =
        & O.info      replaceId
        & O.command  "replace-id" )
 
+orDefault :: [FilePath] -> [FilePath]
+orDefault [] = ["."]
+orDefault fs = fs
+
 handleCommand :: Command -> IO ()
 handleCommand = \case
     Register fnames -> do
         todos <-
-            files2todos fnames
+            files2todos (fnames &orDefault)
             >>= traverse registerTodo
               . filter
               ( todoId
