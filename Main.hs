@@ -69,8 +69,7 @@ displayTodo Todo {..} = maybe err go todoLoc
         suff tid
     suff = dropWhile Data.Char.isSpace todoSuffix
     tid  = Data.Maybe.fromMaybe "" todoId
-    err  = error
-        "displayTodo: Can not display a todo with no location."
+    err  = "[ERROR] Cannot display a todo with no location."
 
 displayTodoCompact :: Todo -> String
 displayTodoCompact Todo {..} = maybe err go todoLoc
@@ -80,8 +79,7 @@ displayTodoCompact Todo {..} = maybe err go todoLoc
         (loc2string loc) tid suff
     suff = dropWhile Data.Char.isSpace todoSuffix
     tid  = Data.Maybe.fromMaybe "" todoId
-    err  = error
-        "displayTodoCompact: Can not display a todo with no location."
+    err  = "[ERROR] Cannot display a todo with no location."
 
 noLocTodo :: String -> String -> String -> Todo
 noLocTodo (pure -> id') pref suff =
