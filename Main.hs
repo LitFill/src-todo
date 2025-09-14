@@ -32,29 +32,34 @@ import qualified Text.Printf
 data Location = Location
     { locFilePath   :: FilePath
     , locLineNumber :: Int
-    } deriving (Show, Read, Eq)
+    }
 
 loc2string :: Location -> String
 loc2string Location {..} =
-    printf "%s:%d" locFilePath locLineNumber
+    Text.Printf.printf
+        "%s:%d"
+        locFilePath
+        locLineNumber
 
 data Todo = Todo
     { todoId     :: Maybe String
     , todoPrefix :: String
     , todoSuffix :: String
     , todoLoc    :: Maybe Location
-    } deriving (Show, Read, Eq)
+    }
 
 showTodo :: Todo -> String
 showTodo Todo {..} =
     case todoId of
-        Just tid -> printf "%sTODO: (%s) %s" todoPrefix tid todoSuffix
-        Nothing  -> printf "%sTODO: %s"      todoPrefix     todoSuffix
+        Just tid ->
+            Text.Printf.printf "%sTODO: (%s) %s" todoPrefix tid todoSuffix
+        Nothing  ->
+            Text.Printf.printf "%sTODO: %s"      todoPrefix     todoSuffix
 
 displayTodo :: Todo -> String
 displayTodo Todo {..} = maybe err go todoLoc
   where
-    go = loc2string .> printf
+    go = loc2string Flow..> Text.Printf.printf
         """
         # Todo
           - note     : %s
