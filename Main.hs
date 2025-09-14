@@ -191,7 +191,7 @@ files :: O.Parser [FilePath]
 files =
     O.metavar "FILES..."
     & O.argument O.str
-    & O.some
+    & O.many
 
 register :: O.Parser Command
 register = Register <$> files
