@@ -67,10 +67,21 @@ displayTodo Todo {..} = maybe err go todoLoc
           - location : %s
         """
         suff tid
-    suff = dropWhile isSpace todoSuffix
-    tid  = fromMaybe "" todoId
+    suff = dropWhile Data.Char.isSpace todoSuffix
+    tid  = Data.Maybe.fromMaybe "" todoId
     err  = error
         "displayTodo: Can not display a todo with no location."
+
+displayTodoCompact :: Todo -> String
+displayTodoCompact Todo {..} = maybe err go todoLoc
+  where
+    go loc = Text.Printf.printf
+        "%s : (%s) %s"
+        (loc2string loc) tid suff
+    suff = dropWhile Data.Char.isSpace todoSuffix
+    tid  = Data.Maybe.fromMaybe "" todoId
+    err  = error
+        "displayTodoCompact: Can not display a todo with no location."
 
 noLocTodo :: String -> String -> String -> Todo
 noLocTodo (pure -> id') pref suff =
@@ -123,112 +134,133 @@ a ||> f = f <$> a
 extractTodos :: FilePath -> IO [Todo]
 extractTodos fname = do
     fname
-     |> TIO.readFile
-    ||> T.lines
-    ||> zip [1..]
-    ||> fmap (fmap (parseMaybe todoP))
-    ||> mapMaybe \(a, b) -> addLoc fname a <$> b
+    Flow.|> Data.Text.IO.readFile
+        ||> Data.Text.lines
+        ||> zip [1..]
+        ||> fmap (fmap (Text.Megaparsec.parseMaybe todoP))
+        ||> Data.Maybe.mapMaybe \(a, b) -> addLoc fname a <$> b
 
 extractTodos' :: FilePath -> IO [Todo]
 extractTodos' root = do
-    (_ :/ tree) <- filterDir successful </$> readDirectoryWithL extractTodos root
+    (_ System.Directory.Tree.:/ tree) <-
+        System.Directory.Tree.filterDir System.Directory.Tree.successful
+        System.Directory.Tree.</$>
+        System.Directory.Tree.readDirectoryWithL extractTodos root
     tree
-        |> flattenDir
-        |> filter (\case File{} -> True; _ -> False)
-        |> concatMap file
-        |> pure
+        Flow.|> System.Directory.Tree.flattenDir
+        Flow.|> filter isFile
+        Flow.|> concatMap System.Directory.Tree.file
+        Flow.|> pure
+  where
+    isFile System.Directory.Tree.File{} = True
+    isFile _                            = False
 
 files2todos :: [FilePath] -> IO [Todo]
 files2todos fnames =
     fnames
-     |> traverse extractTodos'
-    ||> concat
+    Flow.|> traverse extractTodos'
+        ||> concat
 
 registerTodo :: Todo -> IO Todo
 registerTodo todo = do
-    time <- getCurrentTime
-            ||> formatTime
-                defaultTimeLocale
+    time <- Data.Time.getCurrentTime
+            ||> Data.Time.Format.formatTime
+                Data.Time.Format.defaultTimeLocale
                 "%Y%m%d%H%M%S%q"
-    pure todo {todoId = time &take 20 &Just}
+    pure todo {todoId = time Flow.|> take 20 Flow.|> Just}
 
 persistTodo :: Todo -> IO String
 persistTodo t = do
     let t' = showTodo t
-    let Location f l = fromJust t.todoLoc
+    let Location f l = Data.Maybe.fromJust t.todoLoc
     replaceAtLine l f t'
-    pure (fromJust t.todoId)
+    pure (Data.Maybe.fromJust t.todoId)
 
 replaceAtLine :: Int -> FilePath -> String -> IO ()
-replaceAtLine lnum fname (T.pack -> text) =
-    fname
-      & TIO.readFile
-    >>= T.lines
-     .> process
+replaceAtLine lnum fname (Data.Text.pack -> text) =
+    Data.Text.IO.readFile fname
+    >>= Data.Text.lines Flow..> process
   where
     process ls | lnum <= 0 || lnum > length ls =
-        printf
+        Text.Printf.printf
             "[ERROR] replaceAtLine: line number %d is out of bounds."
             lnum
     process ls = do
-        let (hd, tl) = ls &splitAt (lnum - 1)
+        let (hd, tl) = ls Flow.|> splitAt (lnum - 1)
         let ls' = hd ++[ text ]++ drop 1 tl
-        let f'  = T.unlines ls'
-        (tmpFile, tmpHandle) <- openTempFile "." ".src-todo-temp.txt"
-        TIO.hPutStr tmpHandle f'
-        hClose tmpHandle
-        renameFile tmpFile fname
+        let f'  = Data.Text.unlines ls'
+        (tmpFile, tmpHandle) <-
+            System.IO.openTempFile "." ".src-todo-temp.txt"
+        Data.Text.IO.hPutStr tmpHandle f'
+        System.IO.hClose tmpHandle
+        System.Directory.renameFile tmpFile fname
 
 ----------------------------------------
 -- Commands
 ----------------------------------------
 
 data Command
-    = Register [FilePath]
-    | Show String [FilePath]
-    | List [FilePath]
+    = Register                [FilePath]
+    | Show String Bool        [FilePath]
+    | List Bool               [FilePath]
     | ReplaceId String String [FilePath]
 
-files :: O.Parser [FilePath]
+files :: Options.Applicative.Parser [FilePath]
 files =
-    O.metavar "FILES..."
-    & O.argument O.str
-    & O.many
+    Options.Applicative.metavar "FILES..."
+    Flow.|> Options.Applicative.argument Options.Applicative.str
+    Flow.|> Options.Applicative.many
 
-register :: O.Parser Command
+register :: Options.Applicative.Parser Command
 register = Register <$> files
 
-show' :: O.Parser Command
+show' :: Options.Applicative.Parser Command
 show' =
     Show
-    <$> O.argument O.str (O.metavar "ID")
+    <$> Options.Applicative.argument
+        Options.Applicative.str
+       (Options.Applicative.metavar "ID")
+    <*> Options.Applicative.switch
+         ( Options.Applicative.long "compact"
+        <> Options.Applicative.short 'c'
+        <> Options.Applicative.help "Display in a compact format" )
     <*> files
 
-list :: O.Parser Command
-list = List <$> files
+list :: Options.Applicative.Parser Command
+list =
+    List
+    <$> Options.Applicative.switch
+         ( Options.Applicative.long "compact"
+        <> Options.Applicative.short 'c'
+        <> Options.Applicative.help "Display in a compact format" )
+    <*> files
 
-replaceId :: O.Parser Command
+replaceId :: Options.Applicative.Parser Command
 replaceId =
     ReplaceId
-    <$> O.argument O.str (O.metavar "OLD_ID")
-    <*> O.argument O.str (O.metavar "NEW_ID")
+    <$> Options.Applicative.argument
+        Options.Applicative.str
+       (Options.Applicative.metavar "OLD_ID")
+    <*> Options.Applicative.argument
+        Options.Applicative.str
+       (Options.Applicative.metavar "NEW_ID")
     <*> files
 
-opts :: O.Parser Command
+opts :: Options.Applicative.Parser Command
 opts =
-    O.subparser
-    <| ( O.progDesc "Register new todos"
-       & O.info      register
-       & O.command  "register" )
-    <> ( O.progDesc "Show a todo by id"
-       & O.info      show'
-       & O.command  "show" )
-    <> ( O.progDesc "List all todos"
-       & O.info      list
-       & O.command  "list" )
-    <> ( O.progDesc "Replace a todo's id"
-       & O.info      replaceId
-       & O.command  "replace-id" )
+    Options.Applicative.subparser Flow.<|
+       (       Options.Applicative.progDesc "Register new todos"
+       Flow.|> Options.Applicative.info      register
+       Flow.|> Options.Applicative.command  "register"   )
+    <> (       Options.Applicative.progDesc "Show a todo by id"
+       Flow.|> Options.Applicative.info      show'
+       Flow.|> Options.Applicative.command  "show"       )
+    <> (       Options.Applicative.progDesc "List all todos"
+       Flow.|> Options.Applicative.info      list
+       Flow.|> Options.Applicative.command  "list"       )
+    <> (       Options.Applicative.progDesc "Replace a todo's id"
+       Flow.|> Options.Applicative.info      replaceId
+       Flow.|> Options.Applicative.command  "replace-id" )
 
 orDefault :: [FilePath] -> [FilePath]
 orDefault [] = ["."]
@@ -238,40 +270,49 @@ handleCommand :: Command -> IO ()
 handleCommand = \case
     Register fnames -> do
         todos <-
-            files2todos (fnames &orDefault)
+            files2todos (orDefault fnames)
             >>= traverse registerTodo
               . filter
-              ( todoId
-             .> isNothing )
+              ( todoId Flow..> Data.Maybe.isNothing )
         ids <- unlines <$> traverse persistTodo todos
-        unless (null ids) do
-            printf "Registered new todos with these ids:\n%s" ids
+        Control.Monad.unless (null ids) do
+            Text.Printf.printf
+                "Registered new todos with these ids:\n%s"
+                ids
 
-    Show id' fnames -> do
-        todos <- files2todos (fnames &orDefault)
-        forM_ todos \t ->
-            when (t.todoId == Just id') do
-                t &displayTodo &putStrLn
+    Show id' (isCompact -> display) fnames -> do
+        todos <- files2todos (orDefault fnames)
+        Control.Monad.forM_ todos \t ->
+            Control.Monad.when (t.todoId == Just id') do
+                t Flow.|> display Flow.|> putStrLn
 
-    List fnames ->
-        files2todos (fnames &orDefault)
-        >>= mapM_
-          ( displayTodo
-         .> putStrLn )
+    List (isCompact -> display) fnames ->
+        files2todos (orDefault fnames)
+        >>= mapM_ (display Flow..> putStrLn)
 
     ReplaceId oldId newId fnames -> do
-        todos <- files2todos (fnames &orDefault)
-        forM_ todos \t ->
-            when (t.todoId == Just oldId) do
+        todos <- files2todos (orDefault fnames)
+        Control.Monad.forM_ todos \t ->
+            Control.Monad.when (t.todoId == Just oldId) do
                 t {todoId = Just newId}
-                  &persistTodo &void
-                printf "The id %s is replaced with %s\n" oldId newId
+                    Flow.|> persistTodo
+                    Flow.|> Control.Monad.void
+                Text.Printf.printf
+                    "The id %s is replaced with %s\n"
+                    oldId newId
+  where
+    isCompact = Data.Bool.bool
+        displayTodo
+        displayTodoCompact
 
 main :: IO ()
 main = do
-    cmd <-
-        O.execParser
-        <| O.info     (opts O.<**> O.helper)
-        <| O.progDesc "A simple todo manager"
+    cmd <-  Options.Applicative.execParser
+          . Options.Applicative.info cli
+          $ Options.Applicative.progDesc "A simple todo manager"
     handleCommand cmd
+  where
+    cli = opts
+        Options.Applicative.<**>
+        Options.Applicative.helper
 
