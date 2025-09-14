@@ -18,14 +18,14 @@ body = """
 {% endif %}\
 {% if previous %}\
     {% if previous.commit_id and commit_id %}
-        [{{ previous.commit_id | truncate(length=7, end="") }}]({{ previous.commit_id }})...\
-            [{{ commit_id | truncate(length=7, end="") }}]({{ commit_id }})
+        [{{ previous.commit_id | truncate(length=7, end="") }}](https://github.com/LitFill/src-todo/commit/{{ previous.commit_id }})...\
+            [{{ commit_id | truncate(length=7, end="") }}](https://github.com/LitFill/src-todo/commit/{{ commit_id }})
     {% endif %}\
 {% endif %}\
 {% for group, commits in commits | group_by(attribute="group") %}
     ### {{ group | upper_first }}
     {% for commit in commits %}
-        - {{ commit.message | split(pat="\n") | first | upper_first | trim }} ([{{ commit.id | truncate(length=7, end="") }}](commit/{{ commit.id }}))\
+        - {{ commit.message | split(pat="\n") | first | upper_first | trim }} ([{{ commit.id | truncate(length=7, end="") }}](https://github.com/LitFill/src-todo/commit/{{ commit.id }}))\
           {% if commit.footers %}\
             {% for footer in commit.footers -%}
                 , {{ footer.token }}{{ footer.separator }}{{ footer.value }}\
