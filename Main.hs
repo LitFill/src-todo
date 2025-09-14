@@ -1,28 +1,28 @@
-{-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE MultilineStrings #-}
+{-# LANGUAGE BlockArguments      #-}
+{-# LANGUAGE MultilineStrings    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RecordWildCards     #-}
+{-# LANGUAGE ViewPatterns        #-}
 
 module Main where
 
-import Control.Monad    (forM_, unless, when, void)
-import Data.Char        (isSpace)
-import Data.Maybe       (fromJust, isNothing, mapMaybe, fromMaybe)
-import Data.Text        (Text)
-import Data.Time        (getCurrentTime)
-import Data.Time.Format (defaultTimeLocale, formatTime)
-import Data.Void        (Void)
-import System.Directory (renameFile)
-import System.IO        (hClose, openTempFile)
-import Text.Printf      (printf)
+import Control.Monad        (forM_, unless, when, void)
+import Data.Char            (isSpace)
+import Data.Maybe           (fromJust, isNothing, mapMaybe, fromMaybe)
+import Data.Text            (Text)
+import Data.Time            (getCurrentTime)
+import Data.Time.Format     (defaultTimeLocale, formatTime)
+import Data.Void            (Void)
+import System.Directory     (renameFile)
+import System.IO            (hClose, openTempFile)
+import Text.Megaparsec.Char (char, space, string, string')
+import Text.Printf          (printf)
 
 import Data.Function
 import Flow
 import System.Directory.Tree
 import Text.Megaparsec
-import Text.Megaparsec.Char
 
 import Data.Text           qualified as T
 import Data.Text.IO        qualified as TIO
