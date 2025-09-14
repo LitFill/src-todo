@@ -156,40 +156,24 @@ a ||> f = f <$> a
 
 extractTodos :: FilePath -> IO [Todo]
 extractTodos fname = do
-    eres <- Control.Exception.try
-           @Control.Exception.IOException
-           (Data.Text.IO.readFile fname)
-    case eres of
-        Left (show -> err) -> do
-            Text.Printf.printf
-                "[ERROR] Could not read file: %s (%s)\n"
-                fname  err
-            pure []
-        Right fileContent ->
-            fileContent
-            Flow.|> Data.Text.lines
-            Flow.|> zip [1..]
-            Flow.|> fmap (fmap (Text.Megaparsec.parseMaybe todoP))
-            Flow.|> Data.Maybe.mapMaybe (\(a, b) -> addLoc fname a <$> b)
-            Flow.|> pure
+    fname
+    Flow.|> Data.Text.IO.readFile
+        ||> Data.Text.lines
+        ||> zip [1..]
+        ||> fmap (fmap (Text.Megaparsec.parseMaybe todoP))
+        ||> Data.Maybe.mapMaybe \(a, b) -> addLoc fname a <$> b
 
 extractTodos' :: FilePath -> IO [Todo]
 extractTodos' root = do
-    eres <- Control.Exception.try
-           @Control.Exception.IOException
-           (System.Directory.Tree.readDirectoryWithL extractTodos root)
-    case eres of
-        Left (show -> err) -> do
-            Text.Printf.printf
-                "[ERROR] Could not read directory: %s (%s)\n"
-                root err
-            pure []
-        Right (_ System.Directory.Tree.:/ tree) ->
-            tree
-            Flow.|> System.Directory.Tree.flattenDir
-            Flow.|> filter isFile
-            Flow.|> concatMap System.Directory.Tree.file
-            Flow.|> pure
+    (_ System.Directory.Tree.:/ tree) <-
+        System.Directory.Tree.filterDir System.Directory.Tree.successful
+        System.Directory.Tree.</$>
+        System.Directory.Tree.readDirectoryWithL extractTodos root
+    tree
+        Flow.|> System.Directory.Tree.flattenDir
+        Flow.|> filter isFile
+        Flow.|> concatMap System.Directory.Tree.file
+        Flow.|> pure
   where
     isFile System.Directory.Tree.File{} = True
     isFile _                            = False
