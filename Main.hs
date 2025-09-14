@@ -92,36 +92,57 @@ noIdAndLocTodo pref suff =
     Todo Nothing pref suff Nothing
 
 addLoc :: FilePath -> Int -> Todo -> Todo
-addLoc f l t = t {todoLoc = Location f l &Just}
+addLoc f l t = t {todoLoc = Location f l Flow.|> Just}
 
 ----------------------------------------
 -- Parser
 ----------------------------------------
 
-type Parser = Parsec Void Text
+type Parser = Text.Megaparsec.Parsec Data.Void.Void Data.Text.Text
 
 inParens :: Parser a -> Parser a
-inParens = between (char '(') (char ')')
+inParens = Text.Megaparsec.between
+    (Text.Megaparsec.Char.char '(')
+    (Text.Megaparsec.Char.char ')')
 
 withIdTodoP :: Parser Todo
 withIdTodoP = do
-    pref <- manyTill anySingle (lookAhead (string "TODO"))
-    _    <- string' "todo"
-    _    <- space *> char ':' <* space
-    id'  <- inParens (manyTill anySingle (lookAhead (char ')')))
-    suff <- manyTill anySingle eof
+    pref <- Text.Megaparsec.manyTill
+              Text.Megaparsec.anySingle
+            . Text.Megaparsec.lookAhead
+            $ Text.Megaparsec.Char.string "TODO"
+    _    <- Text.Megaparsec.Char.string' "todo"
+    _    <- Text.Megaparsec.Char.space
+             *> Text.Megaparsec.Char.char ':'
+            <*  Text.Megaparsec.Char.space
+    id'  <- inParens
+            . Text.Megaparsec.manyTill
+              Text.Megaparsec.anySingle
+            . Text.Megaparsec.lookAhead
+            $ Text.Megaparsec.Char.char ')'
+    suff <- Text.Megaparsec.manyTill
+            Text.Megaparsec.anySingle
+            Text.Megaparsec.eof
     pure $ noLocTodo id' pref suff
 
 noIdTodoP :: Parser Todo
 noIdTodoP = do
-    pref <- manyTill anySingle (lookAhead (string "TODO"))
-    _    <- string' "todo"
-    _    <- space *> char ':' <* space
-    suff <- manyTill anySingle eof
+    pref <-   Text.Megaparsec.manyTill
+              Text.Megaparsec.anySingle
+            $ Text.Megaparsec.lookAhead
+            $ Text.Megaparsec.Char.string  "TODO"
+    _    <-   Text.Megaparsec.Char.string' "todo"
+    _    <-   Text.Megaparsec.Char.space
+           *> Text.Megaparsec.Char.char ':'
+           <* Text.Megaparsec.Char.space
+    suff <-   Text.Megaparsec.manyTill
+              Text.Megaparsec.anySingle
+              Text.Megaparsec.eof
     pure $ noIdAndLocTodo pref suff
 
 todoP :: Parser Todo
-todoP = try withIdTodoP <|> noIdTodoP
+todoP = Text.Megaparsec.try withIdTodoP
+        Text.Megaparsec.<|> noIdTodoP
 
 ----------------------------------------
 -- File IOs
