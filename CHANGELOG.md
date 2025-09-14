@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.3.1.0 - 2025-09-14
+
+[c316bc5](https://github.com/LitFill/src-todo/commit/c316bc52f75a65df843a1ea3939eab9efb4bd16d)...[53e232f](https://github.com/LitFill/src-todo/commit/53e232f0c5d36b4d728123463322a17a9786cbf5)
+
+### Bug Fixes
+
+- Use `orDefault` in othe sub commands ([71b63a6](https://github.com/LitFill/src-todo/commit/71b63a6c5785f5775d5faacb14446823857e4165))
+- Use `many` instead of `some` ([47b57bf](https://github.com/LitFill/src-todo/commit/47b57bffa1b927eac7afe8335f023738b6019894))
+
+### Documentation
+
+- Update changelogs ([d592856](https://github.com/LitFill/src-todo/commit/d5928560a95c363184d1d15672248b44c7f7e8bc))
+
+### Miscellaneous Tasks
+
+- Bump minor version ([53e232f](https://github.com/LitFill/src-todo/commit/53e232f0c5d36b4d728123463322a17a9786cbf5))
+
+### Styling
+
+- Tidy the lang pragma and imports ([ae85d5d](https://github.com/LitFill/src-todo/commit/ae85d5d94ca185d732109fc9a4a969fbc1e7a032))
+
 ## 0.3.0.0 - 2025-09-14
 
 [e914ee4](https://github.com/LitFill/src-todo/commit/e914ee411906117d3343fc73f84790e149a7972c)...[c316bc5](https://github.com/LitFill/src-todo/commit/c316bc52f75a65df843a1ea3939eab9efb4bd16d)
