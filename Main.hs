@@ -127,10 +127,19 @@ extractTodos fname = do
     ||> fmap (fmap (parseMaybe todoP))
     ||> mapMaybe \(a, b) -> addLoc fname a <$> b
 
+extractTodos' :: FilePath -> IO [Todo]
+extractTodos' root = do
+    (_ :/ tree) <- filterDir successful </$> readDirectoryWithL extractTodos root
+    tree
+        |> flattenDir
+        |> filter (\case File{} -> True; _ -> False)
+        |> concatMap file
+        |> pure
+
 files2todos :: [FilePath] -> IO [Todo]
 files2todos fnames =
     fnames
-     |> mapM extractTodos
+     |> traverse extractTodos'
     ||> concat
 
 registerTodo :: Todo -> IO Todo
