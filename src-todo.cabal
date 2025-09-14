@@ -18,6 +18,7 @@ executable src-todo
         , time
         , flow
         , directory
+        , directory-tree
         , optparse-applicative
 
     hs-source-dirs:   .
