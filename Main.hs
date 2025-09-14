@@ -7,6 +7,7 @@
 
 module Main (main) where
 
+import qualified Control.Exception
 import qualified Control.Monad
 import qualified Data.Bool
 import qualified Data.Char
@@ -152,24 +153,40 @@ a ||> f = f <$> a
 
 extractTodos :: FilePath -> IO [Todo]
 extractTodos fname = do
-    fname
-    Flow.|> Data.Text.IO.readFile
-        ||> Data.Text.lines
-        ||> zip [1..]
-        ||> fmap (fmap (Text.Megaparsec.parseMaybe todoP))
-        ||> Data.Maybe.mapMaybe \(a, b) -> addLoc fname a <$> b
+    eres <- Control.Exception.try
+           @Control.Exception.IOException
+           (Data.Text.IO.readFile fname)
+    case eres of
+        Left (show -> err) -> do
+            Text.Printf.printf
+                "[ERROR] Could not read file: %s (%s)"
+                fname  err
+            pure []
+        Right fileContent ->
+            fileContent
+            Flow.|> Data.Text.lines
+            Flow.|> zip [1..]
+            Flow.|> fmap (fmap (Text.Megaparsec.parseMaybe todoP))
+            Flow.|> Data.Maybe.mapMaybe (\(a, b) -> addLoc fname a <$> b)
+            Flow.|> pure
 
 extractTodos' :: FilePath -> IO [Todo]
 extractTodos' root = do
-    (_ System.Directory.Tree.:/ tree) <-
-        System.Directory.Tree.filterDir System.Directory.Tree.successful
-        System.Directory.Tree.</$>
-        System.Directory.Tree.readDirectoryWithL extractTodos root
-    tree
-        Flow.|> System.Directory.Tree.flattenDir
-        Flow.|> filter isFile
-        Flow.|> concatMap System.Directory.Tree.file
-        Flow.|> pure
+    eres <- Control.Exception.try
+           @Control.Exception.IOException
+           (System.Directory.Tree.readDirectoryWithL extractTodos root)
+    case eres of
+        Left (show -> err) -> do
+            Text.Printf.printf
+                "[ERROR] Could not read directory: %s (%s)"
+                root err
+            pure []
+        Right (_ System.Directory.Tree.:/ tree) ->
+            tree
+            Flow.|> System.Directory.Tree.flattenDir
+            Flow.|> filter isFile
+            Flow.|> concatMap System.Directory.Tree.file
+            Flow.|> pure
   where
     isFile System.Directory.Tree.File{} = True
     isFile _                            = False
@@ -190,29 +207,50 @@ registerTodo todo = do
 
 persistTodo :: Todo -> IO String
 persistTodo t = do
-    let t' = showTodo t
-    let Location f l = Data.Maybe.fromJust t.todoLoc
-    replaceAtLine l f t'
-    pure (Data.Maybe.fromJust t.todoId)
+    let tid = Data.Maybe.fromMaybe "" t.todoId
+    case t.todoLoc of
+        Nothing -> putStrLn "[ERROR] Cannot persist TODO with no location."
+        Just (Location f l) ->
+            Control.Exception.catch @Control.Exception.IOException
+                (replaceAtLine l f $ showTodo t)
+                (Text.Printf.printf
+                    "[ERROR] Failed to persist TODO in file: %s (%s)" f
+                    . show)
+    pure tid
 
 replaceAtLine :: Int -> FilePath -> String -> IO ()
-replaceAtLine lnum fname (Data.Text.pack -> text) =
-    Data.Text.IO.readFile fname
-    >>= Data.Text.lines Flow..> process
+replaceAtLine lnum fname (Data.Text.pack -> text) = do
+    eres <- Control.Exception.try
+           @Control.Exception.IOException
+           (Data.Text.IO.readFile fname)
+    case eres of
+        Left (show -> err) -> Text.Printf.printf
+            "[ERROR] Could not read file: %s (%s)" fname err
+        Right content      -> process $ Data.Text.lines content
   where
-    process ls | lnum <= 0 || lnum > length ls =
-        Text.Printf.printf
-            "[ERROR] replaceAtLine: line number %d is out of bounds."
-            lnum
-    process ls = do
-        let (hd, tl) = ls Flow.|> splitAt (lnum - 1)
-        let ls' = hd ++[ text ]++ drop 1 tl
-        let f'  = Data.Text.unlines ls'
-        (tmpFile, tmpHandle) <-
-            System.IO.openTempFile "." ".src-todo-temp.txt"
-        Data.Text.IO.hPutStr tmpHandle f'
-        System.IO.hClose tmpHandle
-        System.Directory.renameFile tmpFile fname
+    process ls
+        | lnum <= 0 || lnum > length ls = putStrLn $
+            Text.Printf.printf
+                "[ERROR] replaceAtLine: line number %d is out of bounds in %s."
+                lnum fname
+        | otherwise = do
+            let (hd, tl) = ls Flow.|> splitAt (lnum - 1)
+            let ls' = hd ++ [text] ++ drop 1 tl
+            let f'  = Data.Text.unlines ls'
+            eres <- Control.Exception.try
+                   @Control.Exception.IOException
+                   (System.IO.openTempFile "." ".src-todo-temp.txt")
+            case eres of
+                Left (show -> err) ->
+                    putStrLn $ "[ERROR] Failed to open temp file: " ++ err
+                Right (tmpFile, tmpHandle) -> do
+                    Data.Text.IO.hPutStr tmpHandle f'
+                    System.IO.hClose tmpHandle
+                    Control.Exception.catch @Control.Exception.IOException
+                        (System.Directory.renameFile tmpFile fname)
+                        (Text.Printf.printf
+                            "[ERROR] Could not rename temp file: %s"
+                            . show)
 
 ----------------------------------------
 -- Commands
@@ -293,26 +331,36 @@ handleCommand = \case
             >>= traverse registerTodo
               . filter
               ( todoId Flow..> Data.Maybe.isNothing )
-        ids <- unlines <$> traverse persistTodo todos
-        Control.Monad.unless (null ids) do
-            Text.Printf.printf
-                "Registered new todos with these ids:\n%s"
-                ids
+        if null todos then
+            putStrLn "[INFO] No new todos found to register."
+        else do
+            ids <- unlines <$> traverse persistTodo todos
+            Control.Monad.unless (null ids) do
+                Text.Printf.printf
+                    "Registered new todos with these ids:\n%s"
+                    ids
 
     Show id' (isCompact -> display) fnames -> do
         todos <- files2todos (orDefault fnames)
-        Control.Monad.forM_ todos \t ->
-            Control.Monad.when (t.todoId == Just id') do
-                t Flow.|> display Flow.|> putStrLn
+        let found = filter (\t -> t.todoId == Just id') todos
+        if null found then
+            putStrLn $ "[INFO] No TODO found with id: " ++ id'
+        else
+            mapM_ (display Flow..> putStrLn) found
 
     List (isCompact -> display) fnames ->
         files2todos (orDefault fnames)
-        >>= mapM_ (display Flow..> putStrLn)
+        >>= \todos -> if null todos
+            then putStrLn "[INFO] No TODOs found."
+            else mapM_ (display Flow..> putStrLn) todos
 
     ReplaceId oldId newId fnames -> do
         todos <- files2todos (orDefault fnames)
-        Control.Monad.forM_ todos \t ->
-            Control.Monad.when (t.todoId == Just oldId) do
+        let found = filter (\t -> t.todoId == Just oldId) todos
+        if null found then
+            putStrLn $ "[INFO] No TODO found with id: " ++ oldId
+        else
+            Control.Monad.forM_ found \t -> do
                 t {todoId = Just newId}
                     Flow.|> persistTodo
                     Flow.|> Control.Monad.void
@@ -326,12 +374,15 @@ handleCommand = \case
 
 main :: IO ()
 main = do
-    cmd <-  Options.Applicative.execParser
-          . Options.Applicative.info cli
-          $ Options.Applicative.progDesc "A simple todo manager"
-    handleCommand cmd
+    eres <- Control.Exception.try @Control.Exception.IOException parseCLI
+    case eres of
+        Left  err ->
+            putStrLn $ "[ERROR] Could not parse command line: " ++ show err
+        Right cmd -> handleCommand cmd
   where
+    parseCLI = Options.Applicative.execParser
+             . Options.Applicative.info cli
+             $ Options.Applicative.progDesc "A simple todo manager"
     cli = opts
         Options.Applicative.<**>
         Options.Applicative.helper
-
