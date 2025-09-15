@@ -1,25 +1,37 @@
 cabal-version:   3.0
 name:            src-todo
 version:         0.3.5.0
-license:         NONE
+license:         MIT
+author:          LitFill
+maintainer:      marrazzy@gmail.com
+homepage:        https://github.com/LitFill/src-todo
+bug-reports:     https://github.com/LitFill/src-todo/issues
+synopsis:        A command-line tool for managing TODO comments in source code.
+description:     This tool provides a simple yet effective way to find, list, register, and manage TODO items embedded within text files. It can recursively search directories, parse TODOs with and without unique IDs, and persist changes back to the source files.
+category:        Development, Command-Line
+tested-with:     GHC == 9.12.2
 build-type:      Simple
-extra-doc-files: CHANGELOG.md
+extra-doc-files: CHANGELOG.md, README.md
+
+source-repository head
+    type:     git
+    location: https://github.com/LitFill/src-todo
 
 common warnings
-    ghc-options: -Wall
+    ghc-options: -Wall -Wextra
 
 executable src-todo
     import:           warnings
     main-is:          Main.hs
     build-depends:
-        , base ^>=4.21.0.0
-        , megaparsec
-        , text
-        , time
-        , flow
-        , directory
-        , directory-tree
-        , optparse-applicative
+        base                 ^>=4.21.0.0,
+        directory            ^>= 1.3,
+        time                 ^>= 1.14,
+        directory-tree       ^>= 0.12,
+        flow                 ^>= 2.0,
+        megaparsec           ^>= 9.7,
+        text                 ^>= 2.1,
+        optparse-applicative ^>= 0.19,
 
     hs-source-dirs:   .
     default-language: GHC2024
