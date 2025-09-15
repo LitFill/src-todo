@@ -25,14 +25,14 @@ import qualified Data.Char
 import qualified Data.Maybe
 import qualified Data.Text
 import qualified Data.Text.IO
-import qualified Data.Time
-import qualified Data.Time.Format
 import qualified Flow
 import qualified Options.Applicative
 import qualified System.Directory
 import qualified System.Directory.Tree
 import qualified System.IO
 import qualified Text.Printf
+import qualified Data.UUID.V4
+import qualified Data.UUID
 
 ----------------------------------------
 --- * Types
@@ -59,7 +59,7 @@ loc2string Location {..} =
 
 -- | The core data type representing a single TODO item.
 data Todo = Todo
-    { todoId     :: Maybe String     -- ^ Optional unique identifier, typically a timestamp.
+    { todoId     :: Maybe String     -- ^ Optional unique identifier, typically a UUID.
     , todoPrefix :: String           -- ^ Text before @TODO:@ keyword.
     , todoSuffix :: String           -- ^ Text after @TODO:@ keyword.
     , todoLoc    :: Maybe Location   -- ^ Optional location of the TODO.
@@ -117,10 +117,10 @@ displayTodoCompact :: Todo -> String
 displayTodoCompact Todo {..} = maybe err go todoLoc
   where
     go loc = Text.Printf.printf
-        "%s : (%s) %s"
+        "%s : %s%s"
         (loc2string loc) tid suff
     suff = dropWhile Data.Char.isSpace todoSuffix
-    tid  = Data.Maybe.fromMaybe "" todoId
+    tid  = maybe "" (Text.Printf.printf "(%s) ") todoId :: String
     err  = "[ERROR] Cannot display a todo with no location."
 
 -- | A smart constructor for a 'Todo' that has no 'Location' information yet.
@@ -153,15 +153,15 @@ withIdTodoP :: Parser Todo
 withIdTodoP = do
     (pref, hasTodo) <- parsePrefixCI
     if not hasTodo then fail "No TODO found" else do
-        _    <- Data.Attoparsec.Text.skipSpace 
-             *> Data.Attoparsec.Text.char ':' 
+        _    <- Data.Attoparsec.Text.skipSpace
+             *> Data.Attoparsec.Text.char ':'
              <* Data.Attoparsec.Text.skipSpace
         id'  <- Data.Attoparsec.Text.char '('
              *> Data.Attoparsec.Text.takeWhile1 (/= ')')
              <* Data.Attoparsec.Text.char ')'
              <* Data.Attoparsec.Text.skipSpace
-        suff <- Data.Attoparsec.Text.manyTill 
-                Data.Attoparsec.Text.anyChar 
+        suff <- Data.Attoparsec.Text.manyTill
+                Data.Attoparsec.Text.anyChar
                 Data.Attoparsec.Text.endOfInput
         pure $ noLocTodo (Data.Text.unpack id') pref suff
 
@@ -169,11 +169,11 @@ noIdTodoP :: Parser Todo
 noIdTodoP = do
     (pref, hasTodo) <- parsePrefixCI
     if not hasTodo then fail "No TODO found" else do
-        _    <- Data.Attoparsec.Text.skipSpace 
+        _    <- Data.Attoparsec.Text.skipSpace
              *> Data.Attoparsec.Text.char ':'
              <* Data.Attoparsec.Text.skipSpace
-        suff <- Data.Attoparsec.Text.manyTill 
-                Data.Attoparsec.Text.anyChar 
+        suff <- Data.Attoparsec.Text.manyTill
+                Data.Attoparsec.Text.anyChar
                 Data.Attoparsec.Text.endOfInput
         pure $ noIdAndLocTodo pref suff
 
@@ -250,15 +250,17 @@ files2todos fnames =
     Flow.|> traverse extractTodos'
         ||> concat
 
--- | Takes a 'Todo' and assigns a new, unique ID based on the current timestamp.
+-- | Generate a new UUID as a String
+--   (uses random IO)
+genUUIDText :: IO String
+genUUIDText = Data.UUID.toString <$> Data.UUID.V4.nextRandom
+
+-- | Takes a 'Todo' and assigns a new, unique ID using UUID.
 -- The returned 'Todo' will have a 'Just' value for its 'todoId'.
 registerTodo :: Todo -> IO Todo
 registerTodo todo = do
-    time <- Data.Time.getCurrentTime
-            ||> Data.Time.Format.formatTime
-                Data.Time.Format.defaultTimeLocale
-                "%Y%m%d%H%M%S%q"
-    pure todo {todoId = time Flow.|> take 20 Flow.|> Just}
+    uuid <- genUUIDText
+    pure todo {todoId = Just uuid}
 
 -- | Persists a 'Todo' to its source file. This function has the side effect
 -- of modifying a file on disk. It overwrites the line specified in the 'Todo's
@@ -321,6 +323,7 @@ data Command
     | Show String Bool        [FilePath]  -- ^ Show a specific TODO by its ID. The 'Bool' is for compact view.
     | List Bool               [FilePath]  -- ^ List all TODOs found. The 'Bool' is for compact view.
     | ReplaceId String String [FilePath]  -- ^ Replace an old ID with a new ID.
+    | Unregister String       [FilePath]  -- ^ Remove a TODO by its ID.
 
 -- | An 'Options.Applicative' parser for one or more file/directory paths.
 files :: Options.Applicative.Parser [FilePath]
@@ -332,6 +335,15 @@ files =
 -- | 'Options.Applicative' parser for the 'Register' command.
 register :: Options.Applicative.Parser Command
 register = Register <$> files
+
+-- | 'Options.Applicative' parser for the 'Unregister' command.
+unregister :: Options.Applicative.Parser Command
+unregister =
+    Unregister
+    <$> Options.Applicative.argument
+        Options.Applicative.str
+       (Options.Applicative.metavar "ID")
+    <*> files
 
 -- | 'Options.Applicative' parser for the 'Show' command.
 show' :: Options.Applicative.Parser Command
@@ -371,19 +383,22 @@ replaceId =
 -- | The main command-line options parser that combines all subcommands.
 opts :: Options.Applicative.Parser Command
 opts =
-    Options.Applicative.subparser Flow.<|
-       (       Options.Applicative.progDesc "Register new todos"
-       Flow.|> Options.Applicative.info      register
-       Flow.|> Options.Applicative.command  "register"   )
-    <> (       Options.Applicative.progDesc "Show a todo by id"
-       Flow.|> Options.Applicative.info      show'
-       Flow.|> Options.Applicative.command  "show"       )
-    <> (       Options.Applicative.progDesc "List all todos"
-       Flow.|> Options.Applicative.info      list
-       Flow.|> Options.Applicative.command  "list"       )
-    <> (       Options.Applicative.progDesc "Replace a todo's id"
-       Flow.|> Options.Applicative.info      replaceId
-       Flow.|> Options.Applicative.command  "replace-id" )
+     Options.Applicative.subparser Flow.<|
+        (       Options.Applicative.progDesc "Register new todos"
+        Flow.|> Options.Applicative.info      register
+        Flow.|> Options.Applicative.command  "register"   )
+     <> (       Options.Applicative.progDesc "Unregister a todo by id"
+        Flow.|> Options.Applicative.info      unregister
+        Flow.|> Options.Applicative.command  "unregister" )
+     <> (       Options.Applicative.progDesc "Show a todo by id"
+        Flow.|> Options.Applicative.info      show'
+        Flow.|> Options.Applicative.command  "show"       )
+     <> (       Options.Applicative.progDesc "List all todos"
+        Flow.|> Options.Applicative.info      list
+        Flow.|> Options.Applicative.command  "list"       )
+     <> (       Options.Applicative.progDesc "Replace a todo's id"
+        Flow.|> Options.Applicative.info      replaceId
+        Flow.|> Options.Applicative.command  "replace-id" )
 
 -- | If the user provides no file paths, default to searching the current
 -- directory, @["."]@. Otherwise, use the provided paths.
@@ -409,6 +424,18 @@ handleCommand = \case
                 Text.Printf.printf
                     "Registered new todos with these ids:\n%s"
                     ids
+
+    Unregister tid fnames -> do
+        todos <- files2todos (orDefault fnames)
+        let found = filter (hasId tid) todos
+        if null found then
+            putStrLn $ "[INFO] No TODO found with id: " ++ tid
+        else
+            Control.Monad.forM_ found $ \t -> do
+                let t' = t { todoId = Nothing }
+                _ <- persistTodo t'
+                Text.Printf.printf "Unregistered id %s at %s\n"
+                    tid (maybe "?" loc2string t.todoLoc)
 
     Show tid (isCompact -> display) fnames -> do
         todos <- files2todos (orDefault fnames)
