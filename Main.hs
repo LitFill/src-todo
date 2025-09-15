@@ -5,6 +5,15 @@
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ViewPatterns        #-}
 
+{-|
+Module      : Main
+Description : A command-line tool for managing TODO comments in source code.
+
+This module provides a simple yet effective way to find, list, register,
+and manage TODO items embedded within text files. It can recursively
+search directories, parse TODOs with and without unique IDs, and
+persist changes back to the source files.
+-}
 module Main (main) where
 
 import qualified Control.Exception
@@ -27,14 +36,21 @@ import qualified Text.Megaparsec.Char
 import qualified Text.Printf
 
 ----------------------------------------
--- Types
+--- * Types
 ----------------------------------------
 
+-- | Represents a specific location in a file.
 data Location = Location
-    { locFilePath   :: FilePath
-    , locLineNumber :: Int
+    { locFilePath   :: FilePath  -- ^ The path to the file.
+    , locLineNumber :: Int       -- ^ 1-based line number.
     }
 
+instance Show Location where show = loc2string
+
+-- | Formats a 'Location' into a 'String'.
+--
+-- >>> loc2string (Location "app/Main.hs" 10)
+-- "app/Main.hs:10"
 loc2string :: Location -> String
 loc2string Location {..} =
     Text.Printf.printf
@@ -42,13 +58,24 @@ loc2string Location {..} =
         locFilePath
         locLineNumber
 
+-- | The core data type representing a single TODO item.
 data Todo = Todo
-    { todoId     :: Maybe String
-    , todoPrefix :: String
-    , todoSuffix :: String
-    , todoLoc    :: Maybe Location
+    { todoId     :: Maybe String     -- ^ Optional unique identifier, typically a timestamp.
+    , todoPrefix :: String           -- ^ Text before @TODO:@ keyword.
+    , todoSuffix :: String           -- ^ Text after @TODO:@ keyword.
+    , todoLoc    :: Maybe Location   -- ^ Optional location of the TODO.
     }
 
+instance Show Todo where show = showTodo
+
+-- | Converts a 'Todo' back into its source code 'String' representation.
+-- This is used for persisting the 'Todo' back to a file.
+--
+-- >>> showTodo (Todo (Just "#8") "-- " "refactor this." (Just (Location "app/Main.hs" 42)))
+-- "-- TODO: (#8) refactor this."
+--
+-- >>> showTodo (Todo Nothing "-- " "refactor this." (Just (Location "app/Main.hs" 42)))
+-- "-- TODO: refactor this."
 showTodo :: Todo -> String
 showTodo Todo {..} =
     case todoId of
@@ -57,6 +84,15 @@ showTodo Todo {..} =
         Nothing  ->
             Text.Printf.printf "%sTODO: %s"      todoPrefix     todoSuffix
 
+-- | Creates a detailed, multi-line 'String' representation of a 'Todo'.
+-- Ideal for showing detailed information about a single item.
+-- Returns an error message if the 'Todo' has no 'Location'.
+--
+-- >>> lines $ displayTodo (Todo (Just "#8") "-- " "refactor this." (Just (Location "app/Main.hs" 42)))
+-- [ "# Todo",
+--   "  - note     : refactor this.",
+--   "  - id       : #8",
+--   "  - location : app/Main.hs:42" ]
 displayTodo :: Todo -> String
 displayTodo Todo {..} = maybe err go todoLoc
   where
@@ -72,6 +108,12 @@ displayTodo Todo {..} = maybe err go todoLoc
     tid  = Data.Maybe.fromMaybe "" todoId
     err  = "[ERROR] Cannot display a todo with no location."
 
+-- | Creates a compact, single-line 'String' representation of a 'Todo'.
+-- Useful for listing multiple items.
+-- Returns an error message if the 'Todo' has no 'Location'.
+--
+-- >>> displayTodoCompact (Todo (Just "#8") "-- " "refactor this." (Just (Location "app/Main.hs" 42)))
+-- "app/Main.hs:42 : (#8) refactor this."
 displayTodoCompact :: Todo -> String
 displayTodoCompact Todo {..} = maybe err go todoLoc
   where
@@ -82,31 +124,43 @@ displayTodoCompact Todo {..} = maybe err go todoLoc
     tid  = Data.Maybe.fromMaybe "" todoId
     err  = "[ERROR] Cannot display a todo with no location."
 
+-- | A smart constructor for a 'Todo' that has no 'Location' information yet.
+-- params: id, prefix, suffix
 noLocTodo :: String -> String -> String -> Todo
 noLocTodo (pure -> id') pref suff =
     Todo id' pref suff Nothing
 
+-- | A smart constructor for a 'Todo' that has neither an ID nor a 'Location'.
+-- params: prefix, suffix
 noIdAndLocTodo :: String -> String -> Todo
 noIdAndLocTodo pref suff =
     Todo Nothing pref suff Nothing
 
+-- | Adds (or replaces) 'Location' information to an existing 'Todo'.
 addLoc :: FilePath -> Int -> Todo -> Todo
 addLoc f l t = t {todoLoc = Location f l Flow.|> Just}
 
+-- | A predicate to check if a 'Todo' has a specific ID.
 hasId :: String -> Todo -> Bool
 hasId (Just -> tid) t = t.todoId == tid
 
 ----------------------------------------
--- Parser
+--- * Parser
 ----------------------------------------
 
+-- | The 'Parser' type. It is @Parsec Void Text@.
 type Parser = Text.Megaparsec.Parsec Data.Void.Void Data.Text.Text
 
+-- | A parser combinator that runs a given parser between parentheses.
 inParens :: Parser a -> Parser a
 inParens = Text.Megaparsec.between
     (Text.Megaparsec.Char.char '(')
     (Text.Megaparsec.Char.char ')')
 
+-- | A parser for a "TODO:" line that includes a parenthesized ID.
+--
+-- >>> Text.Megaparsec.parseMaybe withIdTodoP (Data.Text.pack "    -- TODO: (#8) refactor this.")
+-- Just     -- TODO: (#8)  refactor this.
 withIdTodoP :: Parser Todo
 withIdTodoP = do
     pref <- Text.Megaparsec.manyTill
@@ -127,6 +181,10 @@ withIdTodoP = do
             Text.Megaparsec.eof
     pure $ noLocTodo id' pref suff
 
+-- | A parser for a "TODO:" line that does not have an ID.
+--
+-- >>> Text.Megaparsec.parseMaybe noIdTodoP (Data.Text.pack "    -- TODO: refactor this.")
+-- Just     -- TODO: refactor this.
 noIdTodoP :: Parser Todo
 noIdTodoP = do
     pref <-   Text.Megaparsec.manyTill
@@ -142,18 +200,23 @@ noIdTodoP = do
               Text.Megaparsec.eof
     pure $ noIdAndLocTodo pref suff
 
+-- | The main 'Todo' parser. It first attempts to parse a 'Todo' with an ID
+-- using 'withIdTodoP', and falls back to 'noIdTodoP' if that fails.
 todoP :: Parser Todo
 todoP = Text.Megaparsec.try withIdTodoP
         Text.Megaparsec.<|> noIdTodoP
 
 ----------------------------------------
--- File IOs
+--- * File IO
 ----------------------------------------
 
+-- | Equivalent to 'Data.Functor.<&>' but 'infixl 0'
 infixl 0 ||>
 (||>) :: Functor f => f a -> (a -> b) -> f b
 a ||> f = f <$> a
 
+-- | Reads a single file and extracts all 'Todo' items from it,
+-- enriching each with its 'Location'.
 extractTodos :: FilePath -> IO [Todo]
 extractTodos fname = do
     fname
@@ -163,6 +226,8 @@ extractTodos fname = do
         ||> fmap (fmap (Text.Megaparsec.parseMaybe todoP))
         ||> Data.Maybe.mapMaybe \(a, b) -> addLoc fname a <$> b
 
+-- | Recursively reads a directory tree, finds all files, and extracts 'Todo'
+-- items from them.
 extractTodos' :: FilePath -> IO [Todo]
 extractTodos' root = do
     (_ System.Directory.Tree.:/ tree) <-
@@ -178,12 +243,15 @@ extractTodos' root = do
     isFile System.Directory.Tree.File{} = True
     isFile _                            = False
 
+-- | Given a list of file or directory paths, extracts all 'Todo's from them.
 files2todos :: [FilePath] -> IO [Todo]
 files2todos fnames =
     fnames
     Flow.|> traverse extractTodos'
         ||> concat
 
+-- | Takes a 'Todo' and assigns a new, unique ID based on the current timestamp.
+-- The returned 'Todo' will have a 'Just' value for its 'todoId'.
 registerTodo :: Todo -> IO Todo
 registerTodo todo = do
     time <- Data.Time.getCurrentTime
@@ -192,6 +260,9 @@ registerTodo todo = do
                 "%Y%m%d%H%M%S%q"
     pure todo {todoId = time Flow.|> take 20 Flow.|> Just}
 
+-- | Persists a 'Todo' to its source file. This function has the side effect
+-- of modifying a file on disk. It overwrites the line specified in the 'Todo's
+-- 'Location' with the new 'Todo' content. Returns the ID of the persisted 'Todo'.
 persistTodo :: Todo -> IO String
 persistTodo t = do
     let tid = Data.Maybe.fromMaybe "" t.todoId
@@ -205,6 +276,8 @@ persistTodo t = do
                     . show)
     pure tid
 
+-- | A low-level utility to replace the contents of a specific line in a file.
+-- This operation is performed safely using a temporary file.
 replaceAtLine :: Int -> FilePath -> String -> IO ()
 replaceAtLine lnum fname (Data.Text.pack -> text) = do
     eres <- Control.Exception.try
@@ -239,24 +312,28 @@ replaceAtLine lnum fname (Data.Text.pack -> text) = do
                             . show)
 
 ----------------------------------------
--- Commands
+--- * Commands
 ----------------------------------------
 
+-- | Represents the set of command-line actions the program can perform.
 data Command
-    = Register                [FilePath]
-    | Show String Bool        [FilePath]
-    | List Bool               [FilePath]
-    | ReplaceId String String [FilePath]
+    = Register                [FilePath]  -- ^ Finds Todos and assign IDs to new Todos.
+    | Show String Bool        [FilePath]  -- ^ Show a specific TODO by its ID. The 'Bool' is for compact view.
+    | List Bool               [FilePath]  -- ^ List all TODOs found. The 'Bool' is for compact view.
+    | ReplaceId String String [FilePath]  -- ^ Replace an old ID with a new ID.
 
+-- | An 'Options.Applicative' parser for one or more file/directory paths.
 files :: Options.Applicative.Parser [FilePath]
 files =
     Options.Applicative.metavar "FILES..."
     Flow.|> Options.Applicative.argument Options.Applicative.str
     Flow.|> Options.Applicative.many
 
+-- | 'Options.Applicative' parser for the 'Register' command.
 register :: Options.Applicative.Parser Command
 register = Register <$> files
 
+-- | 'Options.Applicative' parser for the 'Show' command.
 show' :: Options.Applicative.Parser Command
 show' =
     Show
@@ -269,6 +346,7 @@ show' =
         <> Options.Applicative.help "Display in a compact format" )
     <*> files
 
+-- | 'Options.Applicative' parser for the 'List' command.
 list :: Options.Applicative.Parser Command
 list =
     List
@@ -278,6 +356,7 @@ list =
         <> Options.Applicative.help "Display in a compact format" )
     <*> files
 
+-- | 'Options.Applicative' parser for the 'ReplaceId' command.
 replaceId :: Options.Applicative.Parser Command
 replaceId =
     ReplaceId
@@ -289,6 +368,7 @@ replaceId =
        (Options.Applicative.metavar "NEW_ID")
     <*> files
 
+-- | The main command-line options parser that combines all subcommands.
 opts :: Options.Applicative.Parser Command
 opts =
     Options.Applicative.subparser Flow.<|
@@ -305,10 +385,14 @@ opts =
        Flow.|> Options.Applicative.info      replaceId
        Flow.|> Options.Applicative.command  "replace-id" )
 
+-- | If the user provides no file paths, default to searching the current
+-- directory, @["."]@. Otherwise, use the provided paths.
 orDefault :: [FilePath] -> [FilePath]
 orDefault [] = ["."]
 orDefault fs = fs
 
+-- | The main command handler. It takes a parsed 'Command' and executes the
+-- corresponding IO actions.
 handleCommand :: Command -> IO ()
 handleCommand = \case
     Register fnames -> do
