@@ -6,10 +6,8 @@ CLI tool for managing TODO comments in source code files.
 
 `src-todo` is a command-line interface written in Haskell (btw) that scans
 source files for TODO comments, allowing users to register new TODOs with
-unique IDs, list existing TODOs, display details for a specific TODO by ID, and
-replace TODO IDs. It supports TODO formats like "TODO: (id) description" or
-"TODO: description", where IDs are optional and generated as timestamp-based
-strings (first 20 characters of YYYYmmDDHHMMSSqqqqqq format).
+
+unique IDs, list existing TODOs, display details for a specific TODO by ID, replace TODO IDs, and unregister TODOs (removing their IDs). It supports TODO formats like "TODO: (id) description" or "TODO: description", where IDs are optional and now generated as UUIDs for uniqueness.
 
 The tool operates on files or directories (default: current directory), parsing
 comments using Megaparsec and handling file updates in place.
@@ -59,7 +57,8 @@ If no files are specified, it defaults to the current directory (`.`).
 
 ### Commands
 
-- **register**: Scans for TODOs without IDs, assigns a new timestamp-based ID,
+
+- **register**: Scans for TODOs without IDs, assigns a new unique UUID-based ID,
   updates the files in place, and outputs the new IDs.
 
   ```sh
@@ -76,7 +75,25 @@ If no files are specified, it defaults to the current directory (`.`).
 
   ```
   Registered new todos with these ids:
-  20250914123456789012
+  123e4567-e89b-12d3-a456-426614174000
+  ```
+
+- **unregister <ID>**: Removes the ID and parenthesis from a TODO with the specified ID, restoring the line to its original, unregistered form.
+
+  ```sh
+  src-todo unregister <ID> [FILES...]
+  ```
+
+  Example:
+
+  ```sh
+  src-todo unregister 123e4567-e89b-12d3-a456-426614174000 src/
+  ```
+
+  Output:
+
+  ```
+  Unregistered id 123e4567-e89b-12d3-a456-426614174000 at src/module.hs:10
   ```
 
 - **show <ID>**: Displays details for a TODO with the specified ID, including
