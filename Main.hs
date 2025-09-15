@@ -16,8 +16,10 @@ persist changes back to the source files.
 -}
 module Main (main) where
 
+import qualified Control.Applicative
 import qualified Control.Exception
 import qualified Control.Monad
+import qualified Data.Attoparsec.Text
 import qualified Data.Bool
 import qualified Data.Char
 import qualified Data.Maybe
@@ -25,14 +27,11 @@ import qualified Data.Text
 import qualified Data.Text.IO
 import qualified Data.Time
 import qualified Data.Time.Format
-import qualified Data.Void
 import qualified Flow
 import qualified Options.Applicative
 import qualified System.Directory
 import qualified System.Directory.Tree
 import qualified System.IO
-import qualified Text.Megaparsec
-import qualified Text.Megaparsec.Char
 import qualified Text.Printf
 
 ----------------------------------------
@@ -148,63 +147,67 @@ hasId (Just -> tid) t = t.todoId == tid
 --- * Parser
 ----------------------------------------
 
--- | The 'Parser' type. It is @Parsec Void Text@.
-type Parser = Text.Megaparsec.Parsec Data.Void.Void Data.Text.Text
+type Parser = Data.Attoparsec.Text.Parser
 
--- | A parser combinator that runs a given parser between parentheses.
 inParens :: Parser a -> Parser a
-inParens = Text.Megaparsec.between
-    (Text.Megaparsec.Char.char '(')
-    (Text.Megaparsec.Char.char ')')
+inParens p =
+    Data.Attoparsec.Text.char '(' *> p <* Data.Attoparsec.Text.char ')'
 
--- | A parser for a "TODO:" line that includes a parenthesized ID.
---
--- >>> Text.Megaparsec.parseMaybe withIdTodoP (Data.Text.pack "    -- TODO: (#8) refactor this.")
--- Just     -- TODO: (#8)  refactor this.
 withIdTodoP :: Parser Todo
 withIdTodoP = do
-    pref <- Text.Megaparsec.manyTill
-              Text.Megaparsec.anySingle
-            . Text.Megaparsec.lookAhead
-            $ Text.Megaparsec.Char.string "TODO"
-    _    <- Text.Megaparsec.Char.string' "todo"
-    _    <- Text.Megaparsec.Char.space
-             *> Text.Megaparsec.Char.char ':'
-            <*  Text.Megaparsec.Char.space
-    id'  <- inParens
-            . Text.Megaparsec.manyTill
-              Text.Megaparsec.anySingle
-            . Text.Megaparsec.lookAhead
-            $ Text.Megaparsec.Char.char ')'
-    suff <- Text.Megaparsec.manyTill
-            Text.Megaparsec.anySingle
-            Text.Megaparsec.eof
-    pure $ noLocTodo id' pref suff
+        (pref, hasTodo) <- parsePrefixCI
+        if not hasTodo then fail "No TODO found" else do
+            _    <- stringCI "todo"
+            _    <- Data.Attoparsec.Text.skipSpace 
+                 *> Data.Attoparsec.Text.char ':' 
+                 <* Data.Attoparsec.Text.skipSpace
+            id'  <- inParens 
+                   (Data.Attoparsec.Text.manyTill 
+                    Data.Attoparsec.Text.anyChar 
+                   (Data.Attoparsec.Text.char ')'))
+            suff <- Data.Attoparsec.Text.manyTill 
+                    Data.Attoparsec.Text.anyChar 
+                    Data.Attoparsec.Text.endOfInput
+            pure $ noLocTodo id' pref suff
 
--- | A parser for a "TODO:" line that does not have an ID.
---
--- >>> Text.Megaparsec.parseMaybe noIdTodoP (Data.Text.pack "    -- TODO: refactor this.")
--- Just     -- TODO: refactor this.
 noIdTodoP :: Parser Todo
 noIdTodoP = do
-    pref <-   Text.Megaparsec.manyTill
-              Text.Megaparsec.anySingle
-            $ Text.Megaparsec.lookAhead
-            $ Text.Megaparsec.Char.string  "TODO"
-    _    <-   Text.Megaparsec.Char.string' "todo"
-    _    <-   Text.Megaparsec.Char.space
-           *> Text.Megaparsec.Char.char ':'
-           <* Text.Megaparsec.Char.space
-    suff <-   Text.Megaparsec.manyTill
-              Text.Megaparsec.anySingle
-              Text.Megaparsec.eof
-    pure $ noIdAndLocTodo pref suff
+        (pref, hasTodo) <- parsePrefixCI
+        if not hasTodo then fail "No TODO found" else do
+            _    <- stringCI "todo"
+            _    <- Data.Attoparsec.Text.skipSpace 
+                 *> Data.Attoparsec.Text.char ':'
+                 <* Data.Attoparsec.Text.skipSpace
+            suff <- Data.Attoparsec.Text.manyTill 
+                    Data.Attoparsec.Text.anyChar 
+                    Data.Attoparsec.Text.endOfInput
+            pure $ noIdAndLocTodo pref suff
 
--- | The main 'Todo' parser. It first attempts to parse a 'Todo' with an ID
--- using 'withIdTodoP', and falls back to 'noIdTodoP' if that fails.
+-- | Parse a string case-insensitively (ASCII only)
+stringCI :: Data.Text.Text -> Parser Data.Text.Text
+stringCI s = do
+    t <- Data.Attoparsec.Text.scan 0 go
+    if Data.Text.length t == Data.Text.length s
+        then pure t
+        else fail "stringCI: mismatch"
+  where
+    go i c | i >= Data.Text.length s = Nothing
+           | Data.Char.toLower c == Data.Char.toLower (Data.Text.index s i) = Just (i+1)
+           | otherwise = Nothing
+
 todoP :: Parser Todo
-todoP = Text.Megaparsec.try withIdTodoP
-        Text.Megaparsec.<|> noIdTodoP
+todoP = withIdTodoP Control.Applicative.<|> noIdTodoP
+
+-- | Helper: parse prefix up to (case-insensitive) TODO, return (prefix, found?)
+parsePrefixCI :: Parser (String, Bool)
+parsePrefixCI = do
+    prefix <- Data.Attoparsec.Text.takeWhile1 isNotT Control.Applicative.<|> pure ""
+    rest   <- Data.Attoparsec.Text.take 4
+    pure $ if Data.Text.toCaseFold rest == "todo"
+        then (Data.Text.unpack prefix          , True)
+        else (Data.Text.unpack (prefix <> rest), False)
+  where
+    isNotT c = c /= 'T' && c /= 't'
 
 ----------------------------------------
 --- * File IO
@@ -219,12 +222,18 @@ a ||> f = f <$> a
 -- enriching each with its 'Location'.
 extractTodos :: FilePath -> IO [Todo]
 extractTodos fname = do
-    fname
-    Flow.|> Data.Text.IO.readFile
-        ||> Data.Text.lines
-        ||> zip [1..]
-        ||> fmap (fmap (Text.Megaparsec.parseMaybe todoP))
-        ||> Data.Maybe.mapMaybe \(a, b) -> addLoc fname a <$> b
+    content <- Data.Text.IO.readFile fname
+    let ls = Data.Text.lines content
+    let parsed = zip [1..] $ fmap parseLine ls
+    pure $ Data.Maybe.mapMaybe (\(a, b) -> addLoc fname a <$> b) parsed
+  where
+    -- Helper to run the parser and return Maybe
+    parseLine :: Data.Text.Text -> Maybe Todo
+    parseLine t = case Data.Attoparsec.Text.parseOnly todoP t of
+        Right todo -> Just todo
+        Left _     -> Nothing
+
+-- >>> Data.Attoparsec.Text.parseOnly todoP "  -- TODO: (#123) refactor this."
 
 -- | Recursively reads a directory tree, finds all files, and extracts 'Todo'
 -- items from them.

@@ -29,7 +29,7 @@ executable src-todo
         time                 ^>= 1.14,
         directory-tree       ^>= 0.12,
         flow                 ^>= 2.0,
-        megaparsec           ^>= 9.7,
+        attoparsec           ^>= 0.14,
         text                 ^>= 2.1,
         optparse-applicative ^>= 0.19,
 
