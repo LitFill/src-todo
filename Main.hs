@@ -31,8 +31,8 @@ import qualified System.Directory
 import qualified System.Directory.Tree
 import qualified System.IO
 import qualified Text.Printf
-import qualified Data.UUID.V4
 import qualified Data.UUID
+import qualified Data.UUID.V4
 
 ----------------------------------------
 --- * Types
@@ -147,9 +147,11 @@ hasId (Just -> tid) t = t.todoId == tid
 --- * Parser
 ----------------------------------------
 
-type Parser = Data.Attoparsec.Text.Parser
-
-withIdTodoP :: Parser Todo
+-- | Parser for a 'Todo' with an ID.
+--
+-- >>> Data.Attoparsec.Text.parseOnly withIdTodoP "  // TODO: (#1234) fix this"
+-- Right   // TODO: (#1234) fix this
+withIdTodoP :: Data.Attoparsec.Text.Parser Todo
 withIdTodoP = do
     (pref, hasTodo) <- parsePrefixCI
     if not hasTodo then fail "No TODO found" else do
@@ -165,7 +167,11 @@ withIdTodoP = do
                 Data.Attoparsec.Text.endOfInput
         pure $ noLocTodo (Data.Text.unpack id') pref suff
 
-noIdTodoP :: Parser Todo
+-- | Parser for a 'Todo' without an ID.
+-- 
+-- >>> Data.Attoparsec.Text.parseOnly noIdTodoP "  // TODO: fix this"
+-- Right   // TODO: fix this
+noIdTodoP :: Data.Attoparsec.Text.Parser Todo
 noIdTodoP = do
     (pref, hasTodo) <- parsePrefixCI
     if not hasTodo then fail "No TODO found" else do
@@ -177,22 +183,22 @@ noIdTodoP = do
                 Data.Attoparsec.Text.endOfInput
         pure $ noIdAndLocTodo pref suff
 
--- | Parse a string case-insensitively.
-
-todoP :: Parser Todo
+-- | The main parser that tries to parse a 'Todo' with an ID first,
+-- and if that fails, tries to parse a 'Todo' without an ID.
+--
+-- >>> Data.Attoparsec.Text.parseOnly todoP "  // TODO: (#1234) fix this"
+-- Right   // TODO: (#1234) fix this
+-- 
+-- >>> Data.Attoparsec.Text.parseOnly todoP "  // TODO: fix this"
+-- Right   // TODO: fix this
+todoP :: Data.Attoparsec.Text.Parser Todo
 todoP = withIdTodoP Control.Applicative.<|> noIdTodoP
 
--- >>> Data.Attoparsec.Text.parseOnly (inParens (Data.Attoparsec.Text.manyTill Data.Attoparsec.Text.anyChar (Data.Attoparsec.Text.char ')'))) "(hello) world"
--- Left "')': Failed reading: satisfy"
-
--- >>> Data.Attoparsec.Text.parseOnly (Data.Attoparsec.Text.char '(' *> Data.Attoparsec.Text.takeWhile1 (/= ')') <* Data.Attoparsec.Text.char ')') "(123 fix this)"
--- Right "123 fix this"
-
--- >>> Data.Attoparsec.Text.parseOnly withIdTodoP "    -- TODO: (123) fix this"
--- Right     -- TODO: (123) fix this
-
--- | Helper: parse prefix up to (case-insensitive) TODO, return (prefix, found?)
-parsePrefixCI :: Parser (String, Bool)
+-- | Parses prefix up to (case-insensitive) TODO, return (prefix, found?)
+--
+-- >>> Data.Attoparsec.Text.parseOnly parsePrefixCI "  // TODO: fix this"
+-- Right ("  // ",True)
+parsePrefixCI :: Data.Attoparsec.Text.Parser (String, Bool)
 parsePrefixCI = do
     prefix <- Data.Attoparsec.Text.takeWhile1 isNotT Control.Applicative.<|> pure ""
     rest   <- Data.Attoparsec.Text.take 4
