@@ -149,54 +149,47 @@ hasId (Just -> tid) t = t.todoId == tid
 
 type Parser = Data.Attoparsec.Text.Parser
 
-inParens :: Parser a -> Parser a
-inParens p =
-    Data.Attoparsec.Text.char '(' *> p <* Data.Attoparsec.Text.char ')'
-
 withIdTodoP :: Parser Todo
 withIdTodoP = do
-        (pref, hasTodo) <- parsePrefixCI
-        if not hasTodo then fail "No TODO found" else do
-            _    <- stringCI "todo"
-            _    <- Data.Attoparsec.Text.skipSpace 
-                 *> Data.Attoparsec.Text.char ':' 
-                 <* Data.Attoparsec.Text.skipSpace
-            id'  <- inParens 
-                   (Data.Attoparsec.Text.manyTill 
-                    Data.Attoparsec.Text.anyChar 
-                   (Data.Attoparsec.Text.char ')'))
-            suff <- Data.Attoparsec.Text.manyTill 
-                    Data.Attoparsec.Text.anyChar 
-                    Data.Attoparsec.Text.endOfInput
-            pure $ noLocTodo id' pref suff
+    (pref, hasTodo) <- parsePrefixCI
+    if not hasTodo then fail "No TODO found" else do
+        _    <- Data.Attoparsec.Text.skipSpace 
+             *> Data.Attoparsec.Text.char ':' 
+             <* Data.Attoparsec.Text.skipSpace
+        id'  <- Data.Attoparsec.Text.char '('
+             *> Data.Attoparsec.Text.takeWhile1 (/= ')')
+             <* Data.Attoparsec.Text.char ')'
+             <* Data.Attoparsec.Text.skipSpace
+        suff <- Data.Attoparsec.Text.manyTill 
+                Data.Attoparsec.Text.anyChar 
+                Data.Attoparsec.Text.endOfInput
+        pure $ noLocTodo (Data.Text.unpack id') pref suff
 
 noIdTodoP :: Parser Todo
 noIdTodoP = do
-        (pref, hasTodo) <- parsePrefixCI
-        if not hasTodo then fail "No TODO found" else do
-            _    <- stringCI "todo"
-            _    <- Data.Attoparsec.Text.skipSpace 
-                 *> Data.Attoparsec.Text.char ':'
-                 <* Data.Attoparsec.Text.skipSpace
-            suff <- Data.Attoparsec.Text.manyTill 
-                    Data.Attoparsec.Text.anyChar 
-                    Data.Attoparsec.Text.endOfInput
-            pure $ noIdAndLocTodo pref suff
+    (pref, hasTodo) <- parsePrefixCI
+    if not hasTodo then fail "No TODO found" else do
+        _    <- Data.Attoparsec.Text.skipSpace 
+             *> Data.Attoparsec.Text.char ':'
+             <* Data.Attoparsec.Text.skipSpace
+        suff <- Data.Attoparsec.Text.manyTill 
+                Data.Attoparsec.Text.anyChar 
+                Data.Attoparsec.Text.endOfInput
+        pure $ noIdAndLocTodo pref suff
 
--- | Parse a string case-insensitively (ASCII only)
-stringCI :: Data.Text.Text -> Parser Data.Text.Text
-stringCI s = do
-    t <- Data.Attoparsec.Text.scan 0 go
-    if Data.Text.length t == Data.Text.length s
-        then pure t
-        else fail "stringCI: mismatch"
-  where
-    go i c | i >= Data.Text.length s = Nothing
-           | Data.Char.toLower c == Data.Char.toLower (Data.Text.index s i) = Just (i+1)
-           | otherwise = Nothing
+-- | Parse a string case-insensitively.
 
 todoP :: Parser Todo
 todoP = withIdTodoP Control.Applicative.<|> noIdTodoP
+
+-- >>> Data.Attoparsec.Text.parseOnly (inParens (Data.Attoparsec.Text.manyTill Data.Attoparsec.Text.anyChar (Data.Attoparsec.Text.char ')'))) "(hello) world"
+-- Left "')': Failed reading: satisfy"
+
+-- >>> Data.Attoparsec.Text.parseOnly (Data.Attoparsec.Text.char '(' *> Data.Attoparsec.Text.takeWhile1 (/= ')') <* Data.Attoparsec.Text.char ')') "(123 fix this)"
+-- Right "123 fix this"
+
+-- >>> Data.Attoparsec.Text.parseOnly withIdTodoP "    -- TODO: (123) fix this"
+-- Right     -- TODO: (123) fix this
 
 -- | Helper: parse prefix up to (case-insensitive) TODO, return (prefix, found?)
 parsePrefixCI :: Parser (String, Bool)
@@ -232,8 +225,6 @@ extractTodos fname = do
     parseLine t = case Data.Attoparsec.Text.parseOnly todoP t of
         Right todo -> Just todo
         Left _     -> Nothing
-
--- >>> Data.Attoparsec.Text.parseOnly todoP "  -- TODO: (#123) refactor this."
 
 -- | Recursively reads a directory tree, finds all files, and extracts 'Todo'
 -- items from them.
