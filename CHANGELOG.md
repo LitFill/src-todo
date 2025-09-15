@@ -2,6 +2,59 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.4.0.0 - 2025-09-15
+
+[1c3277b](https://github.com/LitFill/src-todo/commit/1c3277b3fca6055f13320c5513b3b1ad315607df)...[74f1ddf](https://github.com/LitFill/src-todo/commit/74f1ddfd6ba90c8d72dc430a64671fc09d03f0d9)
+
+### Bug Fixes
+
+- Add newlines after error messages ([823e7ac](https://github.com/LitFill/src-todo/commit/823e7ace6579c472a3e2a15fe86413d394403548))
+- Replace megaparsec with attoparsec ([2cedd6a](https://github.com/LitFill/src-todo/commit/2cedd6ac127064e41b5336ccd508bead87229b68))
+
+### Documentation
+
+- Add source documentations ([2fc32af](https://github.com/LitFill/src-todo/commit/2fc32af21c7d16958f787af6a1a516b64629b802))
+- Update README to reflect UUID-based ID generation and add unregister command details ([74f1ddf](https://github.com/LitFill/src-todo/commit/74f1ddfd6ba90c8d72dc430a64671fc09d03f0d9))
+
+### Features
+
+- Displaying todos will not error anymore ([7e85160](https://github.com/LitFill/src-todo/commit/7e8516042996ae3d7ee5f5af658e2aeb40e66ec2))
+- Add error handling with Control.Exception ([e69d95a](https://github.com/LitFill/src-todo/commit/e69d95a3be1586ca9e2a79a5a3391cec21b2acea))
+- Add `hasId` for filtering ([c7fcac4](https://github.com/LitFill/src-todo/commit/c7fcac4354a6b7f5bd9ec5f83e0b880677da7362))
+- Add dependency version bounds and other cabal fields ([a57318d](https://github.com/LitFill/src-todo/commit/a57318d386d0555fe85963302ac006756c775553))
+- Implement UUID-based ID generation for TODOs and add unregister command ([369e636](https://github.com/LitFill/src-todo/commit/369e6364c66a22f90e1153fc5aacae7e96527d89))
+
+### Refactor
+
+- Simplify TODO parsing logic and remove unused functions ([d6c640f](https://github.com/LitFill/src-todo/commit/d6c640fc03c1c9c62ed272ea90b711496a4f87d3))
+
+### Revert
+
+- Revert the behavior of extractTodos ([ffc4a53](https://github.com/LitFill/src-todo/commit/ffc4a5352d0cbbd2bf6be97ca4e1053f7c14a339))
+
+## 0.3.5.0 - 2025-09-14
+
+[53e232f](https://github.com/LitFill/src-todo/commit/53e232f0c5d36b4d728123463322a17a9786cbf5)...[1c3277b](https://github.com/LitFill/src-todo/commit/1c3277b3fca6055f13320c5513b3b1ad315607df)
+
+### Documentation
+
+- Update changelogs ([b5cf3b3](https://github.com/LitFill/src-todo/commit/b5cf3b3da02ba3bf3fa40e12952542ca8c9c6527))
+- Add readme and license ([acbb9d7](https://github.com/LitFill/src-todo/commit/acbb9d7c1a4348375adc31250867cfa7abdba5e0))
+
+### Features
+
+- Remove unused derived typeclasses ([3ba9892](https://github.com/LitFill/src-todo/commit/3ba98924108b6f6cc71aedf5e8e0f99bdedf31b3))
+- Add -c|--compact option for List and Show ([1f496c5](https://github.com/LitFill/src-todo/commit/1f496c569ad170cf192f9187525e3fc090a7241b))
+
+### Miscellaneous Tasks
+
+- Bump version ([1c3277b](https://github.com/LitFill/src-todo/commit/1c3277b3fca6055f13320c5513b3b1ad315607df))
+
+### Styling
+
+- Using fully qualified names ([2fba7be](https://github.com/LitFill/src-todo/commit/2fba7be1b0da22e72d9f4f8c72d7297a923d6975))
+- Using qualified names ([4940e37](https://github.com/LitFill/src-todo/commit/4940e377b908a2d31df231c4ee912741cb3680b6))
+
 ## 0.3.1.0 - 2025-09-14
 
 [c316bc5](https://github.com/LitFill/src-todo/commit/c316bc52f75a65df843a1ea3939eab9efb4bd16d)...[53e232f](https://github.com/LitFill/src-todo/commit/53e232f0c5d36b4d728123463322a17a9786cbf5)
