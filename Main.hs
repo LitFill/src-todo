@@ -25,14 +25,14 @@ import qualified Data.Char
 import qualified Data.Maybe
 import qualified Data.Text
 import qualified Data.Text.IO
+import qualified Data.UUID
+import qualified Data.UUID.V4
 import qualified Flow
 import qualified Options.Applicative
 import qualified System.Directory
 import qualified System.Directory.Tree
 import qualified System.IO
 import qualified Text.Printf
-import qualified Data.UUID
-import qualified Data.UUID.V4
 
 ----------------------------------------
 --- * Types
@@ -44,7 +44,8 @@ data Location = Location
     , locLineNumber :: Int       -- ^ 1-based line number.
     }
 
-instance Show Location where show = loc2string
+instance Show Location where
+    show = loc2string
 
 -- | Formats a 'Location' into a 'String'.
 --
@@ -65,7 +66,8 @@ data Todo = Todo
     , todoLoc    :: Maybe Location   -- ^ Optional location of the TODO.
     }
 
-instance Show Todo where show = showTodo
+instance Show Todo where
+    show = showTodo
 
 -- | Converts a 'Todo' back into its source code 'String' representation.
 -- This is used for persisting the 'Todo' back to a file.
@@ -168,7 +170,7 @@ withIdTodoP = do
         pure $ noLocTodo (Data.Text.unpack id') pref suff
 
 -- | Parser for a 'Todo' without an ID.
--- 
+--
 -- >>> Data.Attoparsec.Text.parseOnly noIdTodoP "  // TODO: fix this"
 -- Right   // TODO: fix this
 noIdTodoP :: Data.Attoparsec.Text.Parser Todo
@@ -188,7 +190,7 @@ noIdTodoP = do
 --
 -- >>> Data.Attoparsec.Text.parseOnly todoP "  // TODO: (#1234) fix this"
 -- Right   // TODO: (#1234) fix this
--- 
+--
 -- >>> Data.Attoparsec.Text.parseOnly todoP "  // TODO: fix this"
 -- Right   // TODO: fix this
 todoP :: Data.Attoparsec.Text.Parser Todo
