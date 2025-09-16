@@ -23,6 +23,11 @@ common warnings
 executable src-todo
     import:           warnings
     main-is:          Main.hs
+    other-modules:
+        Todo.Types
+        Todo.Parser
+        Todo.IO
+        Todo.Commands
     build-depends:
         base                 ^>=4.21.0.0,
         directory            ^>= 1.3,
